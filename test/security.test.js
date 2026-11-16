@@ -1,0 +1,167 @@
+'use strict';
+// Testes de integração dos controles de segurança. Rodar: npm test
+const { test, before, after } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gp-'));
+process.env.DB_PATH = path.join(tmp, 'test.db');
+process.env.MAX_FAILED_LOGINS = '3';
+
+const app = require('../src/server');
+const db = require('../src/db');
+const { hashPassword } = require('../src/security/password');
+
+let server; let base;
+const ADMIN = { email: 'admin@empresa.com.br', password: 'Temp#Admin-2026x' };
+
+class Client {
+  constructor() { this.cookie = ''; this.csrf = ''; }
+  async req(method, url, body, { csrf = true, headers = {} } = {}) {
+    const h = { ...headers };
+    if (this.cookie) h.Cookie = this.cookie;
+    if (body !== undefined) { h['Content-Type'] = h['Content-Type'] || 'application/json'; }
+    if (csrf && this.csrf && method !== 'GET') h['X-CSRF-Token'] = this.csrf;
+    const r = await fetch(base + url, { method, headers: h, body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)), redirect: 'manual' });
+    const sc = r.headers.get('set-cookie');
+    if (sc) { const m = sc.match(/^((?:__Host-)?sid)=([^;]*)/); if (m) this.cookie = m[2] ? `${m[1]}=${m[2]}` : ''; }
+    let data = null; try { data = await r.json(); } catch { /* */ }
+    return { status: r.status, data, headers: r.headers };
+  }
+  async login(email, password) {
+    const r = await this.req('POST', '/api/auth/login', { email, password }, { csrf: false });
+    if (r.data && r.data.csrfToken) this.csrf = r.data.csrfToken;
+    return r;
+  }
+}
+
+before(async () => {
+  const now = Date.now();
+  db.prepare(`INSERT INTO users (email, name, role, password_hash, must_change_password, password_changed_at, created_at)
+    VALUES (?, 'Admin Teste', 'admin', ?, 1, ?, ?)`).run(ADMIN.email, await hashPassword(ADMIN.password), now, now);
+  server = app.listen(0); base = `http://127.0.0.1:${server.address().port}`;
+});
+after(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
+
+test('cabeçalhos de segurança presentes', async () => {
+  const r = await fetch(base + '/login');
+  assert.match(r.headers.get('content-security-policy'), /script-src 'self'/);
+  assert.equal(r.headers.get('x-frame-options'), 'SAMEORIGIN');
+  assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(r.headers.get('x-powered-by'), null);
+});
+
+test('API exige autenticação', async () => {
+  const c = new Client();
+  assert.equal((await c.req('GET', '/api/boards')).status, 401);
+  const home = await c.req('GET', '/');
+  assert.equal(home.status, 302);
+});
+
+test('mensagem de login não revela se o e-mail existe', async () => {
+  const c = new Client();
+  const a = await c.login('ninguem@empresa.com.br', 'qualquer-coisa');
+  const b = await c.login(ADMIN.email, 'senha-errada-123');
+  assert.equal(a.status, 401); assert.equal(b.status, 401);
+  assert.equal(a.data.error, b.data.error);
+  db.prepare('UPDATE users SET failed_attempts = 0 WHERE email = ?').run(ADMIN.email);
+});
+
+let admin;
+test('primeiro acesso exige troca de senha e aplica política', async () => {
+  admin = new Client();
+  const r = await admin.login(ADMIN.email, ADMIN.password);
+  assert.equal(r.status, 200);
+  assert.equal(r.data.user.mustChangePassword, true);
+  assert.match(r.headers.get('set-cookie'), /HttpOnly/i);
+  assert.match(r.headers.get('set-cookie'), /SameSite=Strict/i);
+  assert.equal((await admin.req('GET', '/api/boards')).status, 403);
+  const fraca = await admin.req('POST', '/api/auth/change-password', { currentPassword: ADMIN.password, newPassword: 'curta' });
+  assert.equal(fraca.status, 400);
+  const ok = await admin.req('POST', '/api/auth/change-password', { currentPassword: ADMIN.password, newPassword: 'Nova-Senha#Forte2026' });
+  assert.equal(ok.status, 200);
+  assert.equal((await admin.req('GET', '/api/boards')).status, 200);
+});
+
+test('CSRF: rejeita sem token, com token errado e sem JSON', async () => {
+  assert.equal((await admin.req('POST', '/api/boards', { name: 'X1' }, { csrf: false })).status, 403);
+  const wrong = await admin.req('POST', '/api/boards', { name: 'X1' }, { csrf: false, headers: { 'X-CSRF-Token': 'abc' } });
+  assert.equal(wrong.status, 403);
+  const form = await admin.req('POST', '/api/boards', 'name=X1', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  assert.equal(form.status, 415);
+  const origem = await admin.req('POST', '/api/boards', { name: 'X1' }, { headers: { Origin: 'https://atacante.example' } });
+  assert.equal(origem.status, 403);
+});
+
+let membro; let leitor; let boardId; let listIds; let cardId;
+test('fluxo de quadro, papéis e isolamento entre usuários', async () => {
+  const m = await admin.req('POST', '/api/users', { email: 'membro@empresa.com.br', name: 'Maria Membro', role: 'membro' });
+  assert.equal(m.status, 201); assert.ok(m.data.temporaryPassword.length >= 16);
+  const l = await admin.req('POST', '/api/users', { email: 'leitor@empresa.com.br', name: 'Lucas Leitor', role: 'leitor' });
+  membro = new Client(); await membro.login('membro@empresa.com.br', m.data.temporaryPassword);
+  await membro.req('POST', '/api/auth/change-password', { currentPassword: m.data.temporaryPassword, newPassword: 'Rota#Azul-2026!x' });
+  leitor = new Client(); await leitor.login('leitor@empresa.com.br', l.data.temporaryPassword);
+  await leitor.req('POST', '/api/auth/change-password', { currentPassword: l.data.temporaryPassword, newPassword: 'Caixa#Verde-2026!y' });
+
+  const b = await admin.req('POST', '/api/boards', { name: 'Roteirizador', startDate: '2026-01-01', dueDate: '2026-12-31' });
+  assert.equal(b.status, 201); boardId = b.data.id;
+  assert.equal((await membro.req('GET', `/api/boards/${boardId}`)).status, 404, 'não-membro não vê o quadro');
+  assert.equal((await membro.req('POST', '/api/boards', { name: 'Proibido' })).status, 403, 'membro não cria quadro');
+
+  await admin.req('PUT', `/api/boards/${boardId}/members`, { userIds: [m.data.id, l.data.id] });
+  const view = await membro.req('GET', `/api/boards/${boardId}`);
+  assert.equal(view.status, 200); listIds = view.data.lists.map((x) => x.id);
+
+  const c = await membro.req('POST', `/api/boards/${boardId}/cards`, { listId: listIds[0], title: '<img src=x onerror=alert(1)>' });
+  assert.equal(c.status, 201); cardId = c.data.id;
+  assert.equal((await leitor.req('POST', `/api/boards/${boardId}/cards`, { listId: listIds[0], title: 'x' })).status, 403, 'leitor não edita');
+  assert.equal((await leitor.req('PATCH', `/api/cards/${cardId}`, { title: 'x' })).status, 403);
+
+  const mv = await membro.req('PATCH', `/api/cards/${cardId}/move`, { listId: listIds[3], index: 0 });
+  assert.equal(mv.status, 200);
+  const after = await membro.req('GET', `/api/boards/${boardId}`);
+  assert.equal(after.data.board.done, 1);
+  assert.equal(after.data.cards[0].title, '<img src=x onerror=alert(1)>', 'texto armazenado sem execução (front usa textContent)');
+});
+
+test('validação rejeita campos desconhecidos e IDs inválidos', async () => {
+  assert.equal((await admin.req('PATCH', `/api/cards/${cardId}`, { title: 'ok', board_id: 999 })).status, 400);
+  assert.equal((await admin.req('GET', '/api/boards/1%20OR%201=1')).status, 400);
+  assert.equal((await admin.req('POST', '/api/boards', { name: 'A', dueDate: '2026-13-45' })).status, 400);
+});
+
+test('somente admin acessa usuários e auditoria', async () => {
+  assert.equal((await membro.req('GET', '/api/users')).status, 403);
+  assert.equal((await membro.req('GET', '/api/dashboard/audit')).status, 403);
+  const a = await admin.req('GET', '/api/dashboard/audit');
+  assert.ok(a.data.some((r) => r.action === 'login.sucesso'));
+  assert.ok(!JSON.stringify(a.data).includes('2026!'), 'auditoria não contém senhas');
+});
+
+test('bloqueio de conta após tentativas falhas', async () => {
+  const c = new Client();
+  for (let i = 0; i < 3; i++) await c.login('leitor@empresa.com.br', 'errada-' + i);
+  const r = await c.login('leitor@empresa.com.br', 'Caixa#Verde-2026!y');
+  assert.equal(r.status, 401, 'senha correta é recusada durante o bloqueio');
+  const row = db.prepare("SELECT locked_until FROM users WHERE email = 'leitor@empresa.com.br'").get();
+  assert.ok(row.locked_until > Date.now());
+});
+
+test('desativar usuário encerra sessões; logout invalida a sessão', async () => {
+  const id = db.prepare("SELECT id FROM users WHERE email = 'membro@empresa.com.br'").get().id;
+  await admin.req('PATCH', `/api/users/${id}`, { active: false });
+  assert.equal((await membro.req('GET', '/api/boards')).status, 401);
+  const copia = admin.cookie;
+  await admin.req('POST', '/api/auth/logout', {});
+  const reuse = await fetch(base + '/api/boards', { headers: { Cookie: copia } });
+  assert.equal(reuse.status, 401, 'cookie antigo não funciona após logout');
+});
+
+test('banco guarda só hash de senha e de token de sessão', () => {
+  const u = db.prepare('SELECT password_hash FROM users LIMIT 1').get();
+  assert.match(u.password_hash, /^scrypt\$/);
+  const s = db.prepare('SELECT token_hash FROM sessions LIMIT 1').get();
+  if (s) assert.match(s.token_hash, /^[0-9a-f]{64}$/);
+});

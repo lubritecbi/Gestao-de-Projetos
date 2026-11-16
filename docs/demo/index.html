@@ -1,0 +1,1318 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gestão de Projetos (demonstração)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;700;800&family=Chivo+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Gestão de Projetos — visual "Etiqueta com circuito" (Modelo F2).
+   Azul de placa de circuito como fundo, vermelho da empresa reservado para atrasos,
+   traços finos de 1 px como único ornamento. Sem brilhos, degradês ou sombras coloridas. */
+
+:root {
+  --fundo: #0A1626;
+  --barra: #0C1B30;
+  --placa: #0D1D31;
+  --componente: #12243C;
+  --etiqueta: #13263F;
+  --trilha: #1C3556;
+  --borda: #1D3654;
+  --linha: #24406A;
+  --via: #2A4E7C;
+  --texto: #E8EEF6;
+  --texto-2: #A4B6CC;
+  --azul: #2C6BDD;
+  --azul-claro: #4D8BF0;
+  --azul-texto: #93B8FF;
+  --vermelho: #C8232C;
+  --vermelho-texto: #FF8287;
+  --ambar: #F5C35E;
+  --raio: 2px;
+  --fonte: "Chivo", "Segoe UI", system-ui, sans-serif;
+  --mono: "Chivo Mono", Consolas, ui-monospace, monospace;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  color-scheme: dark;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; scrollbar-color: #2A4468 #0E1C30; }
+html, body { margin: 0; min-height: 100%; }
+body { font: 15px/1.5 var(--fonte); color: var(--texto); background: var(--fundo); }
+::selection { background: var(--azul); color: #fff; }
+h1, h2, h3 { font-weight: 700; margin: 0; line-height: 1.2; letter-spacing: -.01em; }
+h1 { font-size: 1.9rem; } h2 { font-size: 1.2rem; } h3 { font-size: .95rem; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--azul-texto); text-underline-offset: 3px; }
+a:hover { color: #C8DBFF; }
+:focus-visible { outline: 2px solid var(--azul-texto); outline-offset: 2px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.oculto { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Topo: a borda inferior é a trilha principal; a aba ativa recebe uma via */
+.topo { background: var(--barra); border-bottom: 1px solid var(--linha); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; }
+.topo-in { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; gap: .5rem 1.75rem; padding: 0 1.75rem; min-height: 64px; flex-wrap: wrap; }
+.marca { display: flex; align-items: center; gap: .6rem; font-weight: 800; font-size: 1.05rem; color: var(--texto); text-decoration: none; }
+.marca img { width: 26px; height: 26px; }
+.nav { display: flex; gap: .25rem; flex: 1; flex-wrap: wrap; align-self: stretch; }
+.nav a { position: relative; display: flex; align-items: center; min-height: 64px; padding: 0 .75rem; color: var(--texto-2); text-decoration: none; }
+.nav a:hover { color: #fff; }
+.nav a[aria-current="page"] { color: #fff; font-weight: 600; }
+.nav a[aria-current="page"]::before { content: ""; position: absolute; left: 50%; bottom: 6px; width: 7px; height: 7px; margin-left: -3.5px; border: 1.5px solid var(--azul-claro); border-radius: 50%; background: var(--barra); }
+.nav a[aria-current="page"]::after { content: ""; position: absolute; left: calc(50% - 12px); width: 24px; bottom: -1px; height: 1px; background: var(--azul-claro); }
+.usuario { display: flex; align-items: center; gap: .25rem; color: var(--texto-2); font-size: .9rem; }
+.usuario #nome-usuario { margin-right: .5rem; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--barra); }
+
+main { max-width: 1400px; margin: 0 auto; padding: 1.6rem 1.75rem 3rem; }
+main:focus { outline: none; }
+
+/* Cabeçalho de página com o desenho de circuito ao fundo */
+.cabecalho { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; flex-wrap: wrap; min-height: 84px; isolation: isolate; }
+.cabecalho::after { content: ""; position: absolute; right: 0; top: -18px; width: 540px; height: 104px; background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1NDAiIGhlaWdodD0iMTA0IiB2aWV3Qm94PSIwIDAgNTQwIDEwNCIgZmlsbD0ibm9uZSI+PGcgc3Ryb2tlPSIjMUMzNTU2IiBzdHJva2Utd2lkdGg9IjEuNSI+PHBhdGggZD0iTTAgMjJoMTUwbDE4IDE4aDk2Ii8+PHBhdGggZD0iTTAgMzRoMTM4bDE4IDE4aDEwOCIvPjxwYXRoIGQ9Ik02MCA4NGgxMjBsMjAtMjBoNjQiLz48cGF0aCBkPSJNMzQ2IDMwaDcwbDE0LTE0aDExMCIvPjxwYXRoIGQ9Ik0zNDYgNTJoMTk0Ii8+PHBhdGggZD0iTTM0NiA3NGg2MGwxNiAxNmgxMTgiLz48cGF0aCBkPSJNMjgyIDI2VjZoMTIwIi8+PC9nPjxyZWN0IHg9IjI2NCIgeT0iMjYiIHdpZHRoPSI4MiIgaGVpZ2h0PSI1NiIgcng9IjIiIHN0cm9rZT0iIzJBNEU3QyIgc3Ryb2tlLXdpZHRoPSIxLjUiIGZpbGw9IiMwQTE2MjYiLz48cGF0aCBkPSJNMjc2IDI2di02TTI5MCAyNnYtNk0zMDQgMjZ2LTZNMzE4IDI2di02TTMzMiAyNnYtNk0yNzYgODJ2Nk0yOTAgODJ2Nk0zMDQgODJ2Nk0zMTggODJ2Nk0zMzIgODJ2NiIgc3Ryb2tlPSIjMkE0RTdDIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxjaXJjbGUgY3g9IjI3MiIgY3k9IjM0IiByPSIyLjUiIGZpbGw9IiMyQTRFN0MiLz48ZyBzdHJva2U9IiMyQTRFN0MiIHN0cm9rZS13aWR0aD0iMS41IiBmaWxsPSIjMEExNjI2Ij48Y2lyY2xlIGN4PSI2MCIgY3k9Ijg0IiByPSI0Ii8+PGNpcmNsZSBjeD0iNDAyIiBjeT0iNiIgcj0iNCIvPjxjaXJjbGUgY3g9IjQwNiIgY3k9Ijc0IiByPSI0Ii8+PC9nPjxjaXJjbGUgY3g9IjUyMCIgY3k9IjUyIiByPSI0IiBzdHJva2U9IiNDODIzMkMiIHN0cm9rZS13aWR0aD0iMS41IiBmaWxsPSIjMEExNjI2Ii8+PC9zdmc+Cg==") no-repeat; z-index: -1; pointer-events: none; }
+.cabecalho > div:first-child { position: relative; background: var(--fundo); padding-right: 1rem; }
+.cabecalho:has(> .btn)::after { right: 190px; }
+.cabecalho:has(> .acoes)::after { right: 400px; }
+.cabecalho p { margin: .3rem 0 0; color: var(--texto-2); max-width: 70ch; }
+.cabecalho .acoes { display: flex; gap: .5rem; flex-wrap: wrap; }
+.cabecalho .acoes .btn:not(.btn-primario) { background: var(--fundo); }
+
+/* Botões e formulários */
+.btn { min-height: 44px; border: 1px solid #2A4468; background: transparent; color: var(--texto); padding: 0 1rem; border-radius: var(--raio); cursor: pointer; transition: border-color .16s var(--ease), background-color .16s var(--ease); }
+.btn:hover { border-color: var(--azul-texto); }
+.btn-primario { background: var(--azul); border-color: var(--azul); color: #fff; font-weight: 700; }
+.btn-primario:hover { background: #1F5BC7; border-color: #1F5BC7; }
+.btn-perigo { color: var(--vermelho-texto); border-color: #5A2A35; }
+.btn-perigo:hover { border-color: var(--vermelho-texto); }
+.btn-fantasma { border-color: transparent; color: inherit; }
+.btn-fantasma:hover { border-color: #2A4468; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.campo { display: grid; gap: .3rem; margin-bottom: .9rem; }
+.campo label, .campo > .ajuda:first-child { font-size: .85rem; font-weight: 600; color: var(--texto-2); }
+.campo input, .campo select, .campo textarea { border: 1px solid var(--linha); border-radius: var(--raio); padding: .55rem .65rem; background: var(--placa); color: var(--texto); width: 100%; }
+.campo textarea { min-height: 7rem; resize: vertical; }
+.campo input:hover, .campo select:hover, .campo textarea:hover { border-color: var(--via); }
+.grade-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+.ajuda { font-size: .82rem; color: var(--texto-2); }
+.erro { color: var(--vermelho-texto); font-size: .9rem; min-height: 1.2em; }
+
+/* Lista de quadros */
+.quadros { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); border: 1px solid #17304F; background: var(--placa); }
+.quadro-item { display: grid; gap: .7rem; padding: 1.1rem 1.2rem; text-decoration: none; color: inherit; border-right: 1px solid #17304F; border-bottom: 1px solid #17304F; transition: background-color .16s var(--ease); }
+.quadro-item:hover { background: var(--componente); color: inherit; }
+.quadro-item .codigo { font-family: var(--mono); color: var(--texto-2); font-size: .85rem; }
+.quadro-item h2 { font-size: 1.15rem; }
+.quadro-item .rodape { display: flex; justify-content: space-between; align-items: center; gap: .5rem; font-size: .85rem; color: var(--texto-2); }
+
+/* Farol: a cor nunca vem sozinha — sempre com o texto do estado */
+.farol { display: inline-flex; align-items: center; gap: .45rem; font-size: .85rem; font-weight: 600; white-space: nowrap; color: var(--azul-texto); }
+.farol::before { content: ""; width: .6rem; height: .6rem; border-radius: 50%; border: 1.5px solid currentColor; }
+.farol[data-f="No prazo"], .farol[data-f="Concluído"] { color: var(--azul-texto); }
+.farol[data-f="Concluído"]::before { background: currentColor; }
+.farol[data-f="Atenção"] { color: var(--ambar); }
+.farol[data-f="Atrasado"] { color: var(--vermelho-texto); }
+.farol[data-f="Atrasado"]::before { background: currentColor; border-radius: 1px; }
+.farol[data-f="Sem data"] { color: var(--texto-2); }
+
+/* Progresso como trilha: o trecho percorrido acende */
+.progresso { height: 2px; background: var(--linha); position: relative; }
+.progresso > span { display: block; height: 2px; background: var(--azul-claro); width: 0; transition: width .4s var(--ease); }
+
+/* Quadro: grade única com divisórias + etiqueta à direita */
+.area-quadro { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; margin-top: 1.1rem; }
+.kanban-rolagem { flex: 999 1 600px; min-width: 0; overflow-x: auto; }
+.kanban { display: grid; border: 1px solid #17304F; background: var(--placa); }
+.coluna { display: flex; flex-direction: column; min-height: 480px; border-right: 1px solid #17304F; min-width: 0; }
+.coluna:last-child { border-right: 0; }
+.coluna-topo { display: flex; align-items: center; gap: .4rem; padding: .9rem .6rem .55rem .9rem; }
+.coluna-topo h3 { white-space: nowrap; flex: none; }
+.coluna-topo .trilha { flex: 1; height: 1px; background: var(--linha); min-width: 6px; }
+.coluna-topo .via { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--via); flex: none; }
+.coluna-topo .via[data-estado="ativo"] { border-color: var(--azul-claro); }
+.coluna-topo .via[data-estado="atraso"] { border-color: #FF5C63; background: #FF5C63; }
+.coluna-topo .qtd { font-family: var(--mono); color: var(--texto-2); font-size: .85rem; }
+.coluna-topo .btn { min-height: 32px; padding: 0 .3rem; }
+.cartoes { padding: .2rem .6rem .6rem; display: grid; gap: .5rem; align-content: start; flex: 1; overflow-y: auto; }
+.cartoes.alvo { background: rgba(77, 139, 240, .08); }
+.cartao { display: grid; gap: .35rem; width: 100%; text-align: left; padding: .7rem .75rem; background: var(--componente); border: 1px solid var(--borda); border-radius: var(--raio); color: var(--texto); cursor: pointer; transition: border-color .16s var(--ease), background-color .16s var(--ease); }
+.cartao:hover { border-color: #35577F; }
+.cartao[aria-pressed="true"] { border-color: var(--azul-claro); background: #14294A; }
+.cartao.arrastando { opacity: .4; }
+.cartao .linha-topo { display: flex; justify-content: space-between; gap: .5rem; font-family: var(--mono); font-size: .75rem; color: var(--texto-2); }
+.cartao .prazo { font-weight: 600; }
+.cartao[data-prazo="atrasado"] .prazo { color: var(--vermelho-texto); }
+.cartao[data-prazo="proximo"] .prazo { color: var(--ambar); }
+.cartao[data-prazo="feito"] .prazo { color: var(--azul-texto); }
+.cartao .titulo { font-weight: 600; line-height: 1.35; }
+.cartao .resp { font-size: .82rem; color: var(--texto-2); }
+.marcador { height: 2px; background: var(--azul-claro); }
+.coluna-vazia { display: grid; justify-items: center; gap: .6rem; padding: 1.6rem .5rem; text-align: center; }
+.coluna-vazia p { margin: 0; color: var(--texto-2); font-size: .82rem; max-width: 22ch; }
+.novo-cartao { margin: 0 .6rem .7rem; text-align: left; color: var(--texto-2); }
+.nova-coluna { padding: .9rem; }
+
+/* Etiqueta do cartão selecionado */
+.painel-etiqueta { flex: 1 1 360px; max-width: 100%; background: var(--etiqueta); border: 1px solid var(--linha); border-radius: 3px; overflow: hidden; position: sticky; top: 80px; }
+.painel-etiqueta .faixa { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .75rem 1.1rem; background: #1B3B6E; color: #fff; }
+.painel-etiqueta .faixa[data-estado="atrasado"] { background: var(--vermelho); }
+.painel-etiqueta .faixa[data-estado="feito"] { background: #1E4FAE; }
+.painel-etiqueta .faixa strong { font-size: 1.1rem; font-weight: 800; }
+.painel-etiqueta .faixa span { font-family: var(--mono); font-weight: 600; }
+.painel-etiqueta .cabeca { padding: 1.1rem 1.1rem .3rem; display: grid; gap: .35rem; }
+.painel-etiqueta .codigo { font-family: var(--mono); font-size: 2rem; font-weight: 600; line-height: 1.1; }
+.painel-etiqueta dl { margin: .9rem 0 0; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--linha); }
+.painel-etiqueta dl > div { padding: .6rem 1.1rem; border-bottom: 1px solid var(--linha); }
+.painel-etiqueta dl > div:nth-child(odd) { border-right: 1px solid var(--linha); }
+.painel-etiqueta dl > div.largo { grid-column: 1 / -1; border-right: 0; }
+.painel-etiqueta dt { font-size: .75rem; color: var(--texto-2); }
+.painel-etiqueta dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.painel-etiqueta .corpo { padding: 1.1rem; display: grid; gap: .9rem; }
+.painel-etiqueta .descricao { margin: 0; color: var(--texto-2); font-size: .9rem; white-space: pre-wrap; }
+.etapas { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.etapas li { display: grid; gap: .45rem; font-size: .75rem; color: var(--texto-2); }
+.etapas li[aria-current="step"] { color: #fff; font-weight: 700; }
+.etapas .no { display: flex; align-items: center; }
+.etapas .pad { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #2E4B72; background: transparent; transition: background-color .25s var(--ease), border-color .25s var(--ease); }
+.etapas .seg { flex: 1; height: 2px; background: var(--linha); transition: background-color .25s var(--ease); }
+.etapas li:last-child .seg { background: transparent; }
+.etapas li.passou .pad { background: var(--azul-claro); border-color: var(--azul-claro); }
+.etapas li.passou .seg { background: var(--azul-claro); }
+.etapas li[aria-current="step"] .pad { background: var(--texto); border: 3px solid var(--azul-claro); }
+.etapas li[aria-current="step"] .seg { background: var(--linha); }
+.botoes-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.painel-vazio { padding: 2rem 1.1rem; color: var(--texto-2); text-align: center; }
+
+/* Painel de desempenho */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); border: 1px solid #17304F; background: var(--placa); margin-bottom: 1.25rem; }
+.kpi { padding: 1rem 1.1rem; border-right: 1px solid #17304F; }
+.kpi:last-child { border-right: 0; }
+.kpi strong { display: block; font-family: var(--mono); font-size: 1.9rem; font-weight: 600; line-height: 1.15; }
+.kpi span { color: var(--texto-2); font-size: .9rem; }
+.kpi[data-alerta="1"] strong { color: var(--vermelho-texto); }
+.secao { background: var(--placa); border: 1px solid #17304F; padding: 1.1rem 1.2rem; margin-bottom: 1.25rem; }
+.secao h2 { margin-bottom: .8rem; }
+.rolagem { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+th { text-align: left; font-weight: 600; color: var(--texto-2); border-bottom: 1px solid var(--linha); padding: .5rem; white-space: nowrap; font-size: .85rem; }
+td { border-bottom: 1px solid #172C47; padding: .55rem .5rem; vertical-align: middle; }
+td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pct-celula { display: flex; align-items: center; gap: .6rem; justify-content: flex-end; }
+.pct-celula .progresso { width: 90px; }
+.barras { display: flex; align-items: flex-end; gap: .75rem; height: 150px; padding-top: 1rem; border-bottom: 1px solid var(--linha); }
+.barras div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: .3rem; font-size: .78rem; color: var(--texto-2); font-family: var(--mono); }
+.barras i { display: block; width: 100%; max-width: 40px; background: var(--azul-claro); min-height: 2px; border-radius: 1px 1px 0 0; }
+.barras b { color: var(--texto); font-weight: 600; }
+
+/* Diálogos */
+dialog { border: 1px solid var(--linha); border-radius: 3px; padding: 0; width: min(640px, 94vw); background: var(--etiqueta); color: var(--texto); }
+dialog::backdrop { background: rgba(4, 10, 20, .72); }
+.dlg-topo { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.2rem .5rem; }
+.dlg-corpo { padding: .5rem 1.2rem; max-height: 70vh; overflow-y: auto; }
+.dlg-acoes { display: flex; gap: .5rem; justify-content: flex-end; padding: .8rem 1.2rem 1.1rem; flex-wrap: wrap; border-top: 1px solid var(--linha); margin-top: .5rem; }
+.dlg-acoes .esq { margin-right: auto; }
+.senha-temp { font-family: var(--mono); font-size: 1.2rem; background: var(--placa); border: 1px solid var(--linha); padding: .6rem .8rem; border-radius: var(--raio); user-select: all; word-break: break-all; }
+.membros { display: grid; gap: .3rem; max-height: 220px; overflow-y: auto; border: 1px solid var(--linha); border-radius: var(--raio); padding: .5rem .7rem; }
+.membros label { display: flex; gap: .5rem; align-items: center; font-weight: 400; color: var(--texto); }
+input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 16px; }
+
+.aviso { position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); background: var(--etiqueta); color: var(--texto); border: 1px solid var(--linha); padding: .65rem 1rem; border-radius: var(--raio); z-index: 50; max-width: 90vw; }
+.aviso[data-tipo="erro"] { border-color: var(--vermelho); color: var(--vermelho-texto); }
+.vazio { border: 1px dashed var(--linha); padding: 2.4rem 1rem 2rem; text-align: center; color: var(--texto-2); display: grid; justify-items: center; gap: .8rem; }
+.vazio::before { content: ""; width: 132px; height: 52px; background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMzIiIGhlaWdodD0iNTIiIHZpZXdCb3g9IjAgMCAxMzIgNTIiIGZpbGw9Im5vbmUiPjxwYXRoIGQ9Ik0wIDI2aDQwTTkyIDI2aDIybDEwLTEwaDhNOTIgMzZoNDAiIHN0cm9rZT0iIzFDMzU1NiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48cmVjdCB4PSI0MCIgeT0iMTIiIHdpZHRoPSI1MiIgaGVpZ2h0PSIzMCIgcng9IjIiIHN0cm9rZT0iIzJBNEU3QyIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48cGF0aCBkPSJNNTAgMTJWNk02MiAxMlY2TTc0IDEyVjZNODYgMTJWNk01MCA0MnY2TTYyIDQydjZNNzQgNDJ2Nk04NiA0MnY2IiBzdHJva2U9IiMyQTRFN0MiIHN0cm9rZS13aWR0aD0iMS41Ii8+PGNpcmNsZSBjeD0iNCIgY3k9IjI2IiByPSIzIiBzdHJva2U9IiMyQTRFN0MiIHN0cm9rZS13aWR0aD0iMS41IiBmaWxsPSIjMEQxRDMxIi8+PC9zdmc+Cg==") no-repeat; }
+
+/* Entrada */
+.login-pagina { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem; background: var(--fundo) url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjgwMCIgdmlld0JveD0iMCAwIDEyMDAgODAwIiBmaWxsPSJub25lIj48ZyBzdHJva2U9IiMxNjMwNEYiIHN0cm9rZS13aWR0aD0iMS41Ij48cGF0aCBkPSJNMCAxNjBoMjYwbDQwIDQwaDE4MCIvPjxwYXRoIGQ9Ik0wIDE4NGgyNDBsNDAgNDBoMjAwIi8+PHBhdGggZD0iTTAgNjQwaDMwMGw2MC02MGgxMjAiLz48cGF0aCBkPSJNNzIwIDIwMGgxNjBsNDAtNDBoMjgwIi8+PHBhdGggZD0iTTcyMCA0MDBoNDgwIi8+PHBhdGggZD0iTTcyMCA2MDBoMTQwbDQwIDQwaDMwMCIvPjxwYXRoIGQ9Ik02MDAgMHYxMjAiLz48cGF0aCBkPSJNNjAwIDgwMFY2ODAiLz48L2c+PGcgc3Ryb2tlPSIjMjI0MDZBIiBzdHJva2Utd2lkdGg9IjEuNSIgZmlsbD0iIzBBMTYyNiI+PGNpcmNsZSBjeD0iNDgwIiBjeT0iMjAwIiByPSI1Ii8+PGNpcmNsZSBjeD0iNDgwIiBjeT0iNTgwIiByPSI1Ii8+PGNpcmNsZSBjeD0iNjAwIiBjeT0iMTIwIiByPSI1Ii8+PGNpcmNsZSBjeD0iNjAwIiBjeT0iNjgwIiByPSI1Ii8+PGNpcmNsZSBjeD0iNzIwIiBjeT0iMjAwIiByPSI1Ii8+PGNpcmNsZSBjeD0iNzIwIiBjeT0iNjAwIiByPSI1Ii8+PC9nPjxjaXJjbGUgY3g9IjExODAiIGN5PSI0MDAiIHI9IjUiIHN0cm9rZT0iI0M4MjMyQyIgc3Ryb2tlLXdpZHRoPSIxLjUiIGZpbGw9IiMwQTE2MjYiLz48L3N2Zz4K") center / cover no-repeat; }
+.login-caixa { width: min(420px, 100%); background: var(--etiqueta); border: 1px solid var(--linha); border-radius: 3px; overflow: hidden; }
+.login-caixa form { padding: 1.6rem 1.6rem 1.3rem; }
+.login-caixa .faixa-login { display: flex; align-items: center; gap: .6rem; padding: .8rem 1.6rem; background: #1B3B6E; font-weight: 800; }
+.login-caixa .faixa-login img { width: 22px; height: 22px; }
+.login-caixa h1 { font-size: 1.5rem; margin-bottom: .3rem; }
+.login-caixa form > p { color: var(--texto-2); margin: 0 0 1.3rem; }
+.login-caixa .btn-primario { width: 100%; }
+.rodape-login { margin-top: 1rem; font-size: .8rem; color: var(--texto-2); }
+
+@media (max-width: 720px) {
+  .grade-2 { grid-template-columns: 1fr; }
+  .cabecalho::after { display: none; }
+  .topo-in { padding: 0 1rem; }
+  .nav { order: 3; flex: 1 0 100%; flex-wrap: nowrap; overflow-x: auto; }
+  .usuario #nome-usuario { display: none; }
+  .painel-etiqueta { position: static; }
+  main { padding: 1.2rem 1rem 2.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+.faixa-demo { max-width: 1400px; margin: 0 auto; padding: .4rem 1.75rem; font-size: .82rem; color: var(--texto-2); display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.faixa-demo button { background: transparent; color: inherit; border: 1px solid #2A4468; border-radius: 2px; padding: .1rem .55rem; cursor: pointer; font-size: .8rem; }
+.acessos { display: grid; gap: .4rem; margin: .2rem 0 1rem; }
+.acessos .btn { text-align: left; }
+.acessos small { color: var(--texto-2); }
+.login-caixa hr { border: 0; border-top: 1px solid var(--linha); margin: 1.1rem 0; }
+.login-pagina[hidden] { display: none; }
+
+</style>
+</head>
+<body>
+  <div class="login-pagina" id="login-demo" hidden>
+    <div class="login-caixa">
+      <div class="faixa-login"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNiIgaGVpZ2h0PSIyNiIgdmlld0JveD0iMCAwIDI2IDI2IiBmaWxsPSJub25lIj48cmVjdCB4PSI3IiB5PSI3IiB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHJ4PSIxIiBzdHJva2U9IiNFOEVFRjYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEwIDdWM00xMyA3VjNNMTYgN1YzTTEwIDIzdi00TTEzIDIzdi00TTE2IDIzdi00TTMgMTBoNE0zIDE2aDRNMTkgMTBoNE0xOSAxNmg0IiBzdHJva2U9IiM3RkE2REEiIHN0cm9rZS13aWR0aD0iMS40Ii8+PHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iNiIgaGVpZ2h0PSI2IiBmaWxsPSIjRDMyNjJGIi8+PC9zdmc+Cg==" alt="" width="22" height="22">Gestão de Projetos</div>
+      <form id="form-login" novalidate>
+        <h1>Entrar</h1>
+        <p>Demonstração. Escolha um perfil para entrar e ver o que cada um pode fazer.</p>
+        <div class="acessos" id="acessos"></div>
+        <hr>
+        <div class="campo"><label for="email">E-mail</label><input id="email" type="email" autocomplete="off" maxlength="200"></div>
+        <div class="campo"><label for="senha">Senha</label><input id="senha" type="password" autocomplete="off" maxlength="128"></div>
+        <p class="erro" id="erro-login" role="alert"></p>
+        <button class="btn btn-primario" type="submit">Entrar</button>
+        <p class="rodape-login">Senha dos usuários de exemplo: Demo#2026-Teste. Os dados ficam só neste navegador. <button class="btn btn-fantasma" type="button" data-resetar>Restaurar dados iniciais</button></p>
+      </form>
+      <form id="form-troca" hidden novalidate>
+        <h1>Crie sua senha</h1>
+        <p>Por segurança, troque a senha temporária antes de continuar.</p>
+        <div class="campo"><label for="atual">Senha atual (temporária)</label><input id="atual" type="password" autocomplete="off" maxlength="128"></div>
+        <div class="campo"><label for="nova">Nova senha</label><input id="nova" type="password" autocomplete="new-password" maxlength="128">
+          <span class="ajuda">Mínimo de 12 caracteres, combinando 3 tipos: minúsculas, maiúsculas, números e símbolos.</span></div>
+        <div class="campo"><label for="confirma">Confirme a nova senha</label><input id="confirma" type="password" autocomplete="new-password" maxlength="128"></div>
+        <p class="erro" id="erro-troca" role="alert"></p>
+        <button class="btn btn-primario" type="submit">Salvar senha e entrar</button>
+      </form>
+    </div>
+  </div>
+  <header class="topo">
+    <div class="topo-in">
+      <a class="marca" href="#quadros"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNiIgaGVpZ2h0PSIyNiIgdmlld0JveD0iMCAwIDI2IDI2IiBmaWxsPSJub25lIj48cmVjdCB4PSI3IiB5PSI3IiB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHJ4PSIxIiBzdHJva2U9IiNFOEVFRjYiIHN0cm9rZS13aWR0aD0iMS42Ii8+PHBhdGggZD0iTTEwIDdWM00xMyA3VjNNMTYgN1YzTTEwIDIzdi00TTEzIDIzdi00TTE2IDIzdi00TTMgMTBoNE0zIDE2aDRNMTkgMTBoNE0xOSAxNmg0IiBzdHJva2U9IiM3RkE2REEiIHN0cm9rZS13aWR0aD0iMS40Ii8+PHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iNiIgaGVpZ2h0PSI2IiBmaWxsPSIjRDMyNjJGIi8+PC9zdmc+Cg==" alt="" width="26" height="26">Gestão de Projetos</a>
+      <nav class="nav" id="nav" aria-label="Principal"></nav>
+      <div class="usuario">
+        <span id="nome-usuario"></span>
+        <button class="btn btn-fantasma" id="btn-senha" type="button">Alterar senha</button>
+        <button class="btn btn-fantasma" id="btn-sair" type="button">Sair</button>
+      </div>
+    </div>
+  </header>
+  <div class="faixa-demo">Demonstração: os dados ficam só neste navegador e não há segurança real aqui. <button type="button" data-resetar>Restaurar dados iniciais</button></div>
+  <main id="app" tabindex="-1"></main>
+  <dialog id="dlg" aria-labelledby="dlg-titulo"></dialog>
+  <dialog id="dlg-conf" aria-label="Confirmação"></dialog>
+  <script>
+'use strict';
+// ===== Servidor simulado no navegador (somente DEMONSTRAÇÃO) =====
+// Reproduz as rotas e as regras de permissão da API real, guardando os dados no próprio navegador.
+// Não há segurança real aqui: as senhas da demonstração ficam visíveis e os dados podem ser apagados.
+(() => {
+  const CHAVE = 'gp-demo-v1';
+  const SESSAO = 'gp-demo-sessao';
+  const DIA = 86400000;
+  const hojeStr = () => new Date().toLocaleDateString('sv-SE');
+  const addDias = (n) => new Date(Date.now() + n * DIA).toLocaleDateString('sv-SE');
+  const ms = (d) => Date.parse(d + 'T00:00:00');
+  const ls = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* sem armazenamento */ } },
+    del(k) { try { localStorage.removeItem(k); } catch { /* */ } },
+  };
+
+  function semente() {
+    const agora = Date.now();
+    const users = [
+      { id: 1, email: 'ana.admin@empresa.com.br', name: 'Ana Admin', role: 'admin' },
+      { id: 2, email: 'gustavo.gestor@empresa.com.br', name: 'Gustavo Gestor', role: 'gestor' },
+      { id: 3, email: 'marina.membro@empresa.com.br', name: 'Marina Membro', role: 'membro' },
+      { id: 4, email: 'lia.leitora@empresa.com.br', name: 'Lia Leitora', role: 'leitor' },
+    ].map((u) => ({ ...u, password: 'Demo#2026-Teste', active: true, mustChangePassword: false, lockedUntil: null, lastLoginAt: null, createdAt: agora }));
+    const s = { seq: 100, users, boards: [], members: [], lists: [], cards: [], audit: [] };
+    const projetos = [
+      { code: 'PRJ-001', name: 'Roteirizador', area: 'Logística', sponsor: 'Diretoria de Operações', owner: 2, start: addDias(-45), due: addDias(75),
+        desc: 'Ferramenta para gerar e otimizar rotas de entrega, reduzindo km rodado e tempo de planejamento.', membros: [1, 2, 3, 4],
+        cards: [['1. Iniciação', 'Aprovar escopo inicial', 3, 3, -40, null], ['2. Planejamento', 'Levantar regras de roteirização (janelas, capacidade, frota)', 3, 3, -20, -10],
+          ['3. Execução', 'Desenvolver / configurar o roteirizador', 1, 3, null, 20], ['4. Testes / Piloto', 'Piloto em uma região / centro de distribuição', 0, 2, null, 50],
+          ['5. Implantação / Encerramento', 'Treinar equipe e implantar', 0, 2, null, 70]] },
+      { code: 'PRJ-002', name: 'Validação de IPE Logística', area: 'Logística', sponsor: 'Gerência de Qualidade', owner: 3, start: addDias(-60), due: addDias(30),
+        desc: 'Automatizar a coleta e validação do IPE da operação logística, com conferência de dados e relatório de divergências.', membros: [1, 2, 3, 4],
+        cards: [['1. Iniciação', 'Aprovar escopo inicial', 3, 2, -55, null], ['2. Planejamento', 'Definir regras e fontes de dados do IPE', 1, 3, null, -5],
+          ['3. Execução', 'Construir rotina de validação e relatório de divergências', 0, 3, null, 15], ['4. Testes / Piloto', 'Validar resultados com a área de Logística', 0, 2, null, 25],
+          ['5. Implantação / Encerramento', 'Implantar e documentar', 0, 2, null, 30]] },
+      { code: 'PRJ-003', name: 'Validador de Execução por foto', area: 'Operações de campo', sponsor: 'Diretoria de Operações', owner: 2, start: addDias(-7), due: addDias(110),
+        desc: 'Validar a execução de serviços/entregas por meio de foto enviada em campo (evidência com data, hora e local).', membros: [1, 2, 4],
+        cards: [['1. Iniciação', 'Aprovar escopo inicial', 2, 2, null, 3], ['2. Planejamento', 'Definir critérios de aceite da foto (data, hora, GPS, qualidade)', 0, 2, null, 25],
+          ['3. Execução', 'Desenvolver captura e validação das fotos', 0, null, null, 60], ['4. Testes / Piloto', 'Piloto com equipe de campo', 0, null, null, 90],
+          ['5. Implantação / Encerramento', 'Treinar equipes e implantar', 0, null, null, 110]] },
+    ];
+    for (const p of projetos) {
+      const bid = ++s.seq;
+      s.boards.push({ id: bid, code: p.code, name: p.name, description: p.desc, area: p.area, sponsor: p.sponsor, owner_id: p.owner,
+        priority: 'Alta', start_date: p.start, due_date: p.due, archived: false, created_at: agora, updated_at: agora });
+      p.membros.forEach((u) => s.members.push({ board_id: bid, user_id: u }));
+      const lids = [['A fazer', false], ['Em andamento', false], ['Em validação', false], ['Concluído', true]].map(([n, d], i) => {
+        const id = ++s.seq; s.lists.push({ id, board_id: bid, name: n, position: i, is_done: d }); return id;
+      });
+      p.cards.forEach(([fase, titulo, col, resp, feitoHa, prazo]) => {
+        const lid = lids[col];
+        const pos = s.cards.filter((c) => c.list_id === lid).length;
+        s.cards.push({ id: ++s.seq, board_id: bid, list_id: lid, title: titulo, description: '', assignee_id: resp, priority: 'Média', phase: fase,
+          due_date: prazo === null ? null : addDias(prazo), position: pos, completed_at: col === 3 ? agora + (feitoHa || -1) * DIA : null,
+          created_at: agora, updated_at: agora });
+      });
+    }
+    return s;
+  }
+
+  let db = null;
+  try { db = JSON.parse(ls.get(CHAVE)); } catch { db = null; }
+  if (!db || !db.users) { db = semente(); salvar(); }
+  function salvar() { ls.set(CHAVE, JSON.stringify(db)); }
+
+  class Erro extends Error { constructor(status, msg, code) { super(msg); this.status = status; this.code = code; } }
+  const userById = (id) => db.users.find((u) => u.id === id);
+  const atual = () => { const id = Number(ls.get(SESSAO)); const u = userById(id); return u && u.active ? u : null; };
+  const pub = (u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, mustChangePassword: u.mustChangePassword });
+  function audit(u, action, entity, entityId, details) {
+    db.audit.unshift({ id: ++db.seq, at: Date.now(), userEmail: u ? u.email : null, action, entity, entityId, ip: 'navegador (demo)', details: details ? JSON.stringify(details) : null });
+    db.audit = db.audit.slice(0, 500);
+  }
+  const ROLES = ['admin', 'gestor', 'membro', 'leitor'];
+  const exigir = (cond, status, msg) => { if (!cond) throw new Erro(status, msg); };
+  const txt = (v, max, min = 0, campo = 'texto') => {
+    const s = String(v ?? '').trim();
+    exigir(s.length >= min && s.length <= max, 400, `Dados inválidos. ${campo}: tamanho fora do permitido.`);
+    return s;
+  };
+  const data = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    exigir(/^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)), 400, 'Dados inválidos. Data inválida.');
+    return v;
+  };
+
+  function acesso(u, boardId) {
+    const b = db.boards.find((x) => x.id === boardId && !x.archived);
+    const membro = db.members.some((m) => m.board_id === boardId && m.user_id === u.id);
+    exigir(b && (u.role === 'admin' || membro), 404, 'Quadro não encontrado.');
+    return { b, canEdit: u.role === 'admin' || (membro && u.role !== 'leitor'), canManage: u.role === 'admin' || (membro && u.role === 'gestor') };
+  }
+  const editar = (a) => exigir(a.canEdit, 403, 'Seu perfil permite apenas visualizar este quadro.');
+  const gerenciar = (a) => exigir(a.canManage, 403, 'Apenas gestores do quadro ou administradores podem fazer isso.');
+
+  function farol({ total, done, startDate, dueDate }) {
+    const pct = total ? done / total : 0;
+    if (total > 0 && done === total) return { farol: 'Concluído', pct };
+    if (!startDate || !dueDate) return { farol: 'Sem data', pct };
+    const agora = ms(hojeStr()); const ini = ms(startDate); const fim = ms(dueDate);
+    if (agora > fim && pct < 1) return { farol: 'Atrasado', pct };
+    if (Math.max(0, (agora - ini) / Math.max(DIA, fim - ini)) - pct > 0.2) return { farol: 'Atenção', pct };
+    return { farol: 'No prazo', pct };
+  }
+  const isDone = (c) => !!(db.lists.find((l) => l.id === c.list_id) || {}).is_done;
+  function resumo(b) {
+    const cs = db.cards.filter((c) => c.board_id === b.id);
+    const done = cs.filter(isDone).length;
+    const overdue = cs.filter((c) => !isDone(c) && c.due_date && c.due_date < hojeStr()).length;
+    const owner = userById(b.owner_id);
+    return { ...b, owner_name: owner ? owner.name : null, total: cs.length, done, overdue, ...farol({ total: cs.length, done, startDate: b.start_date, dueDate: b.due_date }) };
+  }
+  const visiveis = (u) => db.boards.filter((b) => !b.archived && (u.role === 'admin' || db.members.some((m) => m.board_id === b.id && m.user_id === u.id)))
+    .sort((a, b) => a.code.localeCompare(b.code));
+  function reordenar(itens, item, index) {
+    const resto = itens.filter((x) => x.id !== item.id).sort((a, b) => a.position - b.position);
+    resto.splice(Math.max(0, Math.min(index, resto.length)), 0, item);
+    resto.forEach((x, i) => { x.position = i; });
+  }
+  function politica(pw, u) {
+    const e = [];
+    if (pw.length < 12) e.push('Use pelo menos 12 caracteres.');
+    if ([/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((r) => r.test(pw)).length < 3) e.push('Combine pelo menos 3 tipos: minúsculas, maiúsculas, números e símbolos.');
+    const local = u.email.split('@')[0].split('.')[0].toLowerCase();
+    if (local.length >= 4 && pw.toLowerCase().includes(local)) e.push('A senha não pode conter seu nome ou e-mail.');
+    return e;
+  }
+  function senhaTemp() {
+    const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%*?-_+';
+    const r = new Uint32Array(16); crypto.getRandomValues(r);
+    return 'Aa9!' + [...r].slice(4).map((n) => a[n % a.length]).join('');
+  }
+
+  // ---------- rotas ----------
+  function rota(method, path, body) {
+    const p = path.split('?')[0].split('/').filter(Boolean);
+    const id = (i) => { const n = Number(p[i]); exigir(Number.isInteger(n) && n > 0, 400, 'Dados inválidos.'); return n; };
+
+    if (p[0] === 'auth' && p[1] === 'login' && method === 'POST') {
+      const u = db.users.find((x) => x.email.toLowerCase() === String(body.email || '').trim().toLowerCase());
+      const generico = 'E-mail ou senha incorretos.';
+      if (!u) { audit(null, 'login.falha', null, null, { email: body.email }); throw new Erro(401, generico); }
+      if (u.lockedUntil && u.lockedUntil > Date.now()) { audit(u, 'login.bloqueado', 'user', u.id); throw new Erro(401, `${generico} Após várias tentativas o acesso fica suspenso por 15 minutos.`); }
+      if (u.password !== body.password || !u.active) {
+        if (u.active) {
+          u.failed = (u.failed || 0) + 1;
+          if (u.failed >= 5) { u.lockedUntil = Date.now() + 15 * 60000; u.failed = 0; audit(u, 'conta.bloqueada', 'user', u.id); }
+          else audit(u, 'login.falha', 'user', u.id, { tentativas: u.failed });
+        }
+        throw new Erro(401, generico);
+      }
+      u.failed = 0; u.lockedUntil = null; u.lastLoginAt = Date.now();
+      ls.set(SESSAO, String(u.id)); audit(u, 'login.sucesso', 'user', u.id);
+      return { user: pub(u), csrfToken: 'demo' };
+    }
+    const u = atual();
+    if (!u) throw new Erro(401, 'Sessão expirada. Entre novamente.');
+    if (p[0] === 'auth') {
+      if (p[1] === 'me') return { user: pub(u), csrfToken: 'demo' };
+      if (p[1] === 'logout') { audit(u, 'logout', 'user', u.id); ls.del(SESSAO); return { ok: true }; }
+      if (p[1] === 'change-password') {
+        exigir(body.currentPassword === u.password, 400, 'A senha atual está incorreta.');
+        exigir(body.newPassword !== body.currentPassword, 400, 'A nova senha precisa ser diferente da atual.');
+        const e = politica(String(body.newPassword || ''), u); exigir(!e.length, 400, e.join(' '));
+        u.password = body.newPassword; u.mustChangePassword = false; audit(u, 'senha.alterada', 'user', u.id);
+        return { ok: true };
+      }
+    }
+    if (u.mustChangePassword) throw new Erro(403, 'Troque sua senha para continuar.', 'PASSWORD_CHANGE_REQUIRED');
+
+    // Usuários
+    if (p[0] === 'users') {
+      if (p[1] === 'directory') return db.users.filter((x) => x.active).map((x) => ({ id: x.id, name: x.name, email: x.email, role: x.role })).sort((a, b) => a.name.localeCompare(b.name));
+      exigir(u.role === 'admin', 403, 'Você não tem permissão para esta ação.');
+      if (!p[1] && method === 'GET') return db.users.map((x) => ({ ...pub(x), active: x.active, lockedUntil: x.lockedUntil, lastLoginAt: x.lastLoginAt })).sort((a, b) => a.name.localeCompare(b.name));
+      if (!p[1] && method === 'POST') {
+        const email = txt(body.email, 200, 5, 'e-mail').toLowerCase();
+        exigir(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), 400, 'Dados inválidos. email: e-mail inválido.');
+        exigir(!db.users.some((x) => x.email === email), 409, 'Já existe um usuário com este e-mail.');
+        exigir(ROLES.includes(body.role), 400, 'Dados inválidos. Perfil inválido.');
+        const temp = senhaTemp();
+        const nu = { id: ++db.seq, email, name: txt(body.name, 120, 2, 'nome'), role: body.role, password: temp, active: true, mustChangePassword: true, lockedUntil: null, lastLoginAt: null, createdAt: Date.now() };
+        db.users.push(nu); audit(u, 'usuario.criado', 'user', nu.id, { email, role: nu.role });
+        return { id: nu.id, temporaryPassword: temp };
+      }
+      const alvo = userById(id(1)); exigir(alvo, 404, 'Usuário não encontrado.');
+      if (p[2] === 'reset-password') { const t = senhaTemp(); Object.assign(alvo, { password: t, mustChangePassword: true, lockedUntil: null, failed: 0 }); audit(u, 'senha.redefinida', 'user', alvo.id); return { temporaryPassword: t }; }
+      if (p[2] === 'unlock') { alvo.lockedUntil = null; alvo.failed = 0; audit(u, 'conta.desbloqueada', 'user', alvo.id); return { ok: true }; }
+      if (method === 'PATCH') {
+        exigir(!(alvo.id === u.id && (body.active === false || (body.role && body.role !== 'admin'))), 400, 'Você não pode desativar ou rebaixar a própria conta.');
+        if (alvo.role === 'admin' && ((body.role && body.role !== 'admin') || body.active === false)) {
+          exigir(db.users.filter((x) => x.role === 'admin' && x.active).length > 1, 400, 'O sistema precisa de pelo menos um administrador ativo.');
+        }
+        if (body.role !== undefined) { exigir(ROLES.includes(body.role), 400, 'Perfil inválido.'); alvo.role = body.role; }
+        if (body.active !== undefined) alvo.active = !!body.active;
+        if (body.name !== undefined) alvo.name = txt(body.name, 120, 2, 'nome');
+        audit(u, 'usuario.alterado', 'user', alvo.id, body); return { ok: true };
+      }
+    }
+
+    // Quadros
+    if (p[0] === 'boards') {
+      if (!p[1] && method === 'GET') return visiveis(u).map(resumo);
+      if (!p[1] && method === 'POST') {
+        exigir(['admin', 'gestor'].includes(u.role), 403, 'Você não tem permissão para esta ação.');
+        const ini = data(body.startDate); const fim = data(body.dueDate);
+        exigir(!(ini && fim && fim < ini), 400, 'O fim previsto não pode ser antes do início.');
+        let code = body.code ? txt(body.code, 20, 2, 'ID') : null;
+        if (!code) { let n = db.boards.length + 1; while (db.boards.some((b) => b.code === `PRJ-${String(n).padStart(3, '0')}`)) n++; code = `PRJ-${String(n).padStart(3, '0')}`; }
+        exigir(!db.boards.some((b) => b.code === code), 409, 'Já existe um projeto com este ID.');
+        const b = { id: ++db.seq, code, name: txt(body.name, 120, 2, 'nome'), description: txt(body.description, 4000), area: txt(body.area, 120), sponsor: txt(body.sponsor, 120),
+          owner_id: body.ownerId ?? u.id, priority: body.priority || 'Média', start_date: ini, due_date: fim, archived: false, created_at: Date.now(), updated_at: Date.now() };
+        db.boards.push(b);
+        [['A fazer', false], ['Em andamento', false], ['Em validação', false], ['Concluído', true]].forEach(([n, d], i) => db.lists.push({ id: ++db.seq, board_id: b.id, name: n, position: i, is_done: d }));
+        [...new Set([u.id, b.owner_id].filter(Boolean))].forEach((x) => db.members.push({ board_id: b.id, user_id: x }));
+        audit(u, 'quadro.criado', 'board', b.id, { code, name: b.name }); return { id: b.id, code };
+      }
+      const bid = id(1); const a = acesso(u, bid);
+      if (!p[2] && method === 'GET') {
+        const membros = db.members.filter((m) => m.board_id === bid).map((m) => userById(m.user_id)).filter((x) => x && x.active)
+          .map((x) => ({ id: x.id, name: x.name, email: x.email, role: x.role })).sort((x, y) => x.name.localeCompare(y.name));
+        return {
+          board: resumo(a.b), permissions: { canEdit: a.canEdit, canManage: a.canManage },
+          lists: db.lists.filter((l) => l.board_id === bid).sort((x, y) => x.position - y.position).map((l) => ({ id: l.id, name: l.name, position: l.position, isDone: l.is_done })),
+          cards: db.cards.filter((c) => c.board_id === bid).sort((x, y) => x.position - y.position).map((c) => ({ id: c.id, listId: c.list_id, title: c.title, description: c.description,
+            assigneeId: c.assignee_id, assigneeName: (userById(c.assignee_id) || {}).name || null, dueDate: c.due_date, priority: c.priority, phase: c.phase,
+            position: c.position, completedAt: c.completed_at, updatedAt: c.updated_at })),
+          members: membros,
+        };
+      }
+      if (!p[2] && method === 'PATCH') {
+        gerenciar(a);
+        const ini = body.startDate !== undefined ? data(body.startDate) : a.b.start_date;
+        const fim = body.dueDate !== undefined ? data(body.dueDate) : a.b.due_date;
+        exigir(!(ini && fim && fim < ini), 400, 'O fim previsto não pode ser antes do início.');
+        if (body.code && body.code !== a.b.code) exigir(!db.boards.some((b) => b.code === body.code), 409, 'Já existe um projeto com este ID.');
+        Object.assign(a.b, { code: body.code ?? a.b.code, name: body.name !== undefined ? txt(body.name, 120, 2, 'nome') : a.b.name,
+          description: body.description ?? a.b.description, area: body.area ?? a.b.area, sponsor: body.sponsor ?? a.b.sponsor,
+          owner_id: body.ownerId !== undefined ? body.ownerId : a.b.owner_id, priority: body.priority ?? a.b.priority, start_date: ini, due_date: fim, updated_at: Date.now() });
+        audit(u, 'quadro.alterado', 'board', bid, Object.keys(body)); return { ok: true };
+      }
+      if (!p[2] && method === 'DELETE') { gerenciar(a); a.b.archived = true; audit(u, 'quadro.arquivado', 'board', bid); return { ok: true }; }
+      if (p[2] === 'members') {
+        gerenciar(a);
+        const ids = [...new Set(body.userIds || [])]; if (u.role !== 'admin' && !ids.includes(u.id)) ids.push(u.id);
+        db.members = db.members.filter((m) => m.board_id !== bid).concat(ids.filter((x) => userById(x)).map((x) => ({ board_id: bid, user_id: x })));
+        audit(u, 'quadro.membros', 'board', bid, { userIds: ids }); return { ok: true };
+      }
+      if (p[2] === 'lists') {
+        editar(a);
+        const pos = db.lists.filter((l) => l.board_id === bid).length;
+        const l = { id: ++db.seq, board_id: bid, name: txt(body.name, 80, 1, 'nome'), position: pos, is_done: !!body.isDone };
+        db.lists.push(l); audit(u, 'lista.criada', 'list', l.id, { name: l.name }); return { id: l.id };
+      }
+      if (p[2] === 'cards') {
+        editar(a);
+        const l = db.lists.find((x) => x.id === body.listId && x.board_id === bid); exigir(l, 400, 'Coluna inválida para este quadro.');
+        if (body.assigneeId) exigir(db.members.some((m) => m.board_id === bid && m.user_id === body.assigneeId), 400, 'O responsável precisa ser membro do quadro.');
+        const c = { id: ++db.seq, board_id: bid, list_id: l.id, title: txt(body.title, 200, 1, 'título'), description: txt(body.description, 10000),
+          assignee_id: body.assigneeId ?? null, due_date: data(body.dueDate), priority: body.priority || 'Média', phase: body.phase || '',
+          position: db.cards.filter((x) => x.list_id === l.id).length, completed_at: l.is_done ? Date.now() : null, created_at: Date.now(), updated_at: Date.now() };
+        db.cards.push(c); audit(u, 'cartao.criado', 'card', c.id, { title: c.title }); return { id: c.id };
+      }
+    }
+
+    // Colunas
+    if (p[0] === 'lists') {
+      const l = db.lists.find((x) => x.id === id(1)); exigir(l, 404, 'Coluna não encontrada.');
+      editar(acesso(u, l.board_id));
+      if (method === 'DELETE') {
+        exigir(!db.cards.some((c) => c.list_id === l.id), 400, 'Mova ou exclua os cartões antes de excluir a coluna.');
+        db.lists = db.lists.filter((x) => x.id !== l.id); audit(u, 'lista.excluida', 'list', l.id, { name: l.name }); return { ok: true };
+      }
+      if (body.name !== undefined) l.name = txt(body.name, 80, 1, 'nome');
+      if (body.isDone !== undefined && !!body.isDone !== l.is_done) {
+        l.is_done = !!body.isDone; db.cards.filter((c) => c.list_id === l.id).forEach((c) => { c.completed_at = l.is_done ? Date.now() : null; });
+      }
+      if (body.index !== undefined) reordenar(db.lists.filter((x) => x.board_id === l.board_id), l, body.index);
+      audit(u, 'lista.alterada', 'list', l.id, body); return { ok: true };
+    }
+
+    // Cartões
+    if (p[0] === 'cards') {
+      const c = db.cards.find((x) => x.id === id(1)); exigir(c, 404, 'Cartão não encontrado.');
+      editar(acesso(u, c.board_id));
+      if (method === 'DELETE') { db.cards = db.cards.filter((x) => x.id !== c.id); audit(u, 'cartao.excluido', 'card', c.id, { title: c.title }); return { ok: true }; }
+      if (p[2] === 'move') {
+        const alvo = db.lists.find((x) => x.id === body.listId && x.board_id === c.board_id); exigir(alvo, 400, 'Coluna inválida para este quadro.');
+        const de = db.lists.find((x) => x.id === c.list_id);
+        c.completed_at = alvo.is_done ? (de.is_done ? c.completed_at : Date.now()) : null;
+        c.list_id = alvo.id; c.updated_at = Date.now();
+        reordenar(db.cards.filter((x) => x.list_id === alvo.id), c, body.index);
+        db.cards.filter((x) => x.list_id === de.id).sort((x, y) => x.position - y.position).forEach((x, i) => { x.position = i; });
+        if (de.id !== alvo.id) audit(u, 'cartao.movido', 'card', c.id, { de: de.name, para: alvo.name });
+        return { ok: true };
+      }
+      if (body.assigneeId) exigir(db.members.some((m) => m.board_id === c.board_id && m.user_id === body.assigneeId), 400, 'O responsável precisa ser membro do quadro.');
+      if (body.title !== undefined) c.title = txt(body.title, 200, 1, 'título');
+      if (body.description !== undefined) c.description = txt(body.description, 10000);
+      if (body.assigneeId !== undefined) c.assignee_id = body.assigneeId;
+      if (body.dueDate !== undefined) c.due_date = data(body.dueDate);
+      if (body.priority !== undefined) c.priority = body.priority;
+      if (body.phase !== undefined) c.phase = body.phase;
+      c.updated_at = Date.now(); audit(u, 'cartao.alterado', 'card', c.id, Object.keys(body)); return { ok: true };
+    }
+
+    // Painel
+    if (p[0] === 'dashboard') {
+      if (p[1] === 'audit') { exigir(u.role === 'admin', 403, 'Você não tem permissão para esta ação.'); return db.audit.slice(0, 300); }
+      const t = hojeStr();
+      const boards = visiveis(u).map((b) => { const r = resumo(b); return { id: b.id, code: b.code, name: b.name, priority: b.priority, startDate: b.start_date, dueDate: b.due_date, ownerName: r.owner_name, total: r.total, done: r.done, overdue: r.overdue, pct: r.pct, farol: r.farol }; });
+      const ids = new Set(boards.map((b) => b.id));
+      const cs = db.cards.filter((c) => ids.has(c.board_id));
+      const d30 = Date.now() - 30 * DIA;
+      const pessoas = new Map();
+      cs.filter((c) => c.assignee_id).forEach((c) => {
+        const pu = userById(c.assignee_id); if (!pu) return;
+        const r = pessoas.get(pu.id) || { id: pu.id, name: pu.name, open: 0, overdue: 0, done30: 0, onTime30: 0 };
+        if (!isDone(c)) { r.open++; if (c.due_date && c.due_date < t) r.overdue++; }
+        else if (c.completed_at >= d30) { r.done30++; if (!c.due_date || new Date(c.completed_at).toLocaleDateString('sv-SE') <= c.due_date) r.onTime30++; }
+        pessoas.set(pu.id, r);
+      });
+      const feitos = cs.filter((c) => isDone(c) && c.completed_at);
+      const throughput = Array.from({ length: 8 }, (_, i) => {
+        const fim = Date.now() - (7 - i) * 7 * DIA; const ini = fim - 7 * DIA;
+        return { weekEnding: new Date(fim).toLocaleDateString('sv-SE'), count: feitos.filter((c) => c.completed_at > ini && c.completed_at <= fim).length };
+      });
+      const totals = boards.reduce((acc, b) => ({ total: acc.total + b.total, done: acc.done + b.done, overdue: acc.overdue + b.overdue }), { total: 0, done: 0, overdue: 0 });
+      return { today: t, boards, people: [...pessoas.values()].sort((a, b) => a.name.localeCompare(b.name)), throughput, totals };
+    }
+    throw new Erro(404, 'Recurso não encontrado.');
+  }
+
+  // Intercepta as chamadas /api/... da interface e responde com o servidor simulado.
+  const fetchOriginal = window.fetch.bind(window);
+  window.fetch = async (url, opts = {}) => {
+    if (typeof url !== 'string' || !url.startsWith('/api/')) return fetchOriginal(url, opts);
+    const method = (opts.method || 'GET').toUpperCase();
+    let body = {};
+    try { body = opts.body ? JSON.parse(opts.body) : {}; } catch { body = {}; }
+    try {
+      const r = rota(method, url.slice(5), body);
+      salvar();
+      return new Response(JSON.stringify(r), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } catch (e) {
+      salvar();
+      const status = e.status || 500;
+      return new Response(JSON.stringify({ error: e.status ? e.message : 'Erro interno na demonstração.', code: e.code }), { status, headers: { 'Content-Type': 'application/json' } });
+    }
+  };
+
+  window.gpDemo = {
+    usuarios: () => db.users.filter((x) => x.active).map((x) => ({ email: x.email, name: x.name, role: x.role })),
+    senhaPadrao: 'Demo#2026-Teste',
+    resetar() { ls.del(CHAVE); ls.del(SESSAO); location.hash = ''; location.reload(); },
+    logado: () => !!atual(),
+  };
+})();
+
+  </script>
+  <script>
+'use strict';
+// Tela de entrada da demonstração (substitui a página /login do sistema real).
+(() => {
+  const tela = document.getElementById('login-demo');
+  const $ = (id) => document.getElementById(id);
+  const PAPEIS = { admin: 'Administrador', gestor: 'Gestor', membro: 'Membro', leitor: 'Leitor' };
+  async function post(url, body) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Não foi possível concluir.');
+    return d;
+  }
+  function entrar(d) {
+    if (d.user.mustChangePassword) { $('form-login').hidden = true; $('form-troca').hidden = false; $('atual').focus(); return; }
+    location.hash = 'quadros'; location.reload();
+  }
+  window.gpMostrarLogin = () => {
+    document.querySelector('.topo').hidden = true;
+    document.querySelector('.faixa-demo').hidden = true;
+    document.getElementById('app').hidden = true;
+    tela.hidden = false;
+    const lista = $('acessos');
+    lista.replaceChildren(...window.gpDemo.usuarios().slice(0, 6).map((u) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn';
+      b.append(`Entrar como ${u.name} `);
+      const s = document.createElement('small'); s.textContent = `(${PAPEIS[u.role]})`; b.append(s);
+      b.addEventListener('click', async () => {
+        $('erro-login').textContent = '';
+        try { entrar(await post('/api/auth/login', { email: u.email, password: window.gpDemo.senhaPadrao })); }
+        catch (e) { $('erro-login').textContent = e.message; }
+      });
+      return b;
+    }));
+  };
+  $('form-login').addEventListener('submit', async (e) => {
+    e.preventDefault(); $('erro-login').textContent = '';
+    try { entrar(await post('/api/auth/login', { email: $('email').value, password: $('senha').value })); }
+    catch (err) { $('erro-login').textContent = err.message; $('senha').value = ''; }
+  });
+  $('form-troca').addEventListener('submit', async (e) => {
+    e.preventDefault(); $('erro-troca').textContent = '';
+    if ($('nova').value !== $('confirma').value) { $('erro-troca').textContent = 'A confirmação não confere com a nova senha.'; return; }
+    try { await post('/api/auth/change-password', { currentPassword: $('atual').value, newPassword: $('nova').value }); location.hash = 'quadros'; location.reload(); }
+    catch (err) { $('erro-troca').textContent = err.message; }
+  });
+  document.querySelectorAll('[data-resetar]').forEach((b) => b.addEventListener('click', () => window.gpDemo.resetar()));
+})();
+
+  
+  </script>
+  <script>
+'use strict';
+// Front-end sem bibliotecas externas. Regra de segurança: dados do usuário entram no DOM
+// SOMENTE via textContent/atributos (nunca innerHTML), o que impede XSS armazenado.
+(() => {
+  const state = { me: null, csrf: null, directory: [] };
+  const app = document.getElementById('app');
+  const dlg = document.getElementById('dlg');
+  const ROLES = { admin: 'Administrador', gestor: 'Gestor', membro: 'Membro', leitor: 'Leitor' };
+  const PRIORIDADES = ['Alta', 'Média', 'Baixa'];
+  const FASES = ['', '1. Iniciação', '2. Planejamento', '3. Execução', '4. Testes / Piloto', '5. Implantação / Encerramento'];
+
+  // ---------- utilitários ----------
+  function el(tag, props = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else if (k === 'dataset') Object.assign(n.dataset, v);
+      else if (k === 'value') n.value = v;
+      else if (k in n && typeof v !== 'string') n[k] = v;
+      else n.setAttribute(k, v === true ? '' : String(v));
+    }
+    for (const c of kids.flat()) if (c !== null && c !== undefined && c !== false) n.append(c instanceof Node ? c : String(c));
+    return n;
+  }
+  const fmtData = (d) => (d ? d.split('-').reverse().join('/') : '');
+  const fmtHora = (ms) => (ms ? new Date(ms).toLocaleString('pt-BR') : '');
+  const pct = (x) => `${Math.round((x || 0) * 100)}%`;
+  const hoje = () => new Date().toLocaleDateString('sv-SE');
+
+  function aviso(msg, tipo = 'ok') {
+    const t = el('div', { class: 'aviso', role: 'status', dataset: { tipo }, text: msg });
+    document.body.append(t);
+    setTimeout(() => t.remove(), 4000);
+  }
+
+  async function api(method, url, body) {
+    const opts = { method, credentials: 'same-origin', headers: {} };
+    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    if (method !== 'GET') opts.headers['X-CSRF-Token'] = state.csrf;
+    const r = await fetch('/api' + url, opts);
+    if (r.status === 401) { window.gpMostrarLogin(); throw new Error('Sessão expirada.'); }
+    let data = {};
+    try { data = await r.json(); } catch { /* sem corpo */ }
+    if (r.status === 403 && data.code === 'PASSWORD_CHANGE_REQUIRED') { window.gpMostrarLogin(); throw new Error(data.error); }
+    if (!r.ok) throw new Error(data.error || 'Não foi possível concluir a ação.');
+    return data;
+  }
+  const tentar = (fn) => async (...a) => { try { await fn(...a); } catch (e) { aviso(e.message, 'erro'); } };
+
+  function campo(label, input, ajuda) {
+    if (!input.id) input.id = 'c' + Math.random().toString(36).slice(2, 9);
+    return el('div', { class: 'campo' }, el('label', { for: input.id, text: label }), input, ajuda ? el('span', { class: 'ajuda', text: ajuda }) : null);
+  }
+  function seletor(opcoes, valor) {
+    return el('select', {}, opcoes.map(([v, t]) => el('option', { value: v, text: t, selected: String(v) === String(valor ?? '') })));
+  }
+
+  // ---------- diálogo ----------
+  function abrirDialogo(titulo, corpo, acoes) {
+    dlg.replaceChildren(
+      el('div', { class: 'dlg-topo' }, el('h2', { id: 'dlg-titulo', text: titulo }),
+        el('button', { class: 'btn btn-fantasma', type: 'button', 'aria-label': 'Fechar', text: '✕', onclick: () => dlg.close() })),
+      el('div', { class: 'dlg-corpo' }, corpo),
+      el('div', { class: 'dlg-acoes' }, acoes),
+    );
+    dlg.showModal();
+  }
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+
+  function mostrarSenhaTemporaria(nome, senha) {
+    const caixa = el('div', { class: 'senha-temp', text: senha });
+    abrirDialogo('Senha temporária', [
+      el('p', { text: `Entregue esta senha a ${nome} por um canal seguro (pessoalmente ou mensagem direta). Ela aparece só agora e será trocada no primeiro acesso.` }),
+      caixa,
+    ], [
+      el('button', { class: 'btn', type: 'button', text: 'Copiar', onclick: tentar(async () => { await navigator.clipboard.writeText(senha); aviso('Senha copiada.'); }) }),
+      el('button', { class: 'btn btn-primario', type: 'button', text: 'Concluir', onclick: () => dlg.close() }),
+    ]);
+  }
+
+  // ---------- confirmação e entrada de texto (sem confirm/prompt nativos) ----------
+  const dlgConf = document.getElementById('dlg-conf');
+  function confirmar(msg, rotuloTexto) {
+    return new Promise((ok) => {
+      const entrada = rotuloTexto ? el('input', { maxlength: 80 }) : null;
+      let resp = null;
+      dlgConf.replaceChildren(
+        el('div', { class: 'dlg-corpo' }, el('p', { text: msg }), entrada ? campo(rotuloTexto, entrada) : null),
+        el('div', { class: 'dlg-acoes' },
+          el('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: () => dlgConf.close() }),
+          el('button', { class: 'btn btn-primario', type: 'button', text: entrada ? 'Adicionar' : 'Confirmar',
+            onclick: () => { resp = entrada ? entrada.value.trim() : true; dlgConf.close(); } })));
+      dlgConf.addEventListener('close', () => ok(resp || (entrada ? null : false)), { once: true });
+      dlgConf.showModal(); if (entrada) entrada.focus();
+    });
+  }
+  const pedirTexto = (rotulo) => confirmar('Informe o nome:', rotulo);
+
+  // ---------- navegação ----------
+  function montarNav(rota) {
+    const itens = [['quadros', 'Quadros'], ['desempenho', 'Desempenho']];
+    if (state.me.role === 'admin') itens.push(['usuarios', 'Usuários'], ['auditoria', 'Auditoria']);
+    const ativo = rota === '' || rota.startsWith('quadro') ? 'quadros' : rota;
+    document.getElementById('nav').replaceChildren(...itens.map(([h, t]) =>
+      el('a', { href: '#' + h, text: t, 'aria-current': ativo === h ? 'page' : null })));
+  }
+
+  async function rotear() {
+    const rota = location.hash.slice(1);
+    montarNav(rota);
+    dlg.open && dlg.close();
+    try {
+      if (/^quadro-\d+$/.test(rota)) await telaQuadro(Number(rota.split('-')[1]));
+      else if (rota === 'desempenho') await telaDesempenho();
+      else if (rota === 'usuarios' && state.me.role === 'admin') await telaUsuarios();
+      else if (rota === 'auditoria' && state.me.role === 'admin') await telaAuditoria();
+      else await telaQuadros();
+      app.focus({ preventScroll: true });
+    } catch (e) {
+      app.replaceChildren(el('div', { class: 'vazio', text: e.message }));
+    }
+  }
+
+  // ---------- tela: lista de quadros ----------
+  async function telaQuadros() {
+    const quadros = await api('GET', '/boards');
+    const podeCriar = ['admin', 'gestor'].includes(state.me.role);
+    app.replaceChildren(
+      el('div', { class: 'cabecalho' },
+        el('div', {}, el('h1', { text: 'Quadros de projeto' }), el('p', { text: 'Cada projeto é um quadro. Abra um quadro para mover as atividades entre as colunas.' })),
+        podeCriar ? el('button', { class: 'btn btn-primario', type: 'button', text: 'Novo projeto', onclick: () => dialogoQuadro() }) : null),
+      quadros.length
+        ? el('div', { class: 'quadros' }, quadros.map((q) => {
+          const barra = el('span'); barra.style.width = pct(q.pct);
+          return el('a', { class: 'quadro-item', href: `#quadro-${q.id}` },
+            el('span', { class: 'codigo', text: q.code }),
+            el('h2', { text: q.name }),
+            el('div', { class: 'progresso', role: 'img', 'aria-label': `${pct(q.pct)} concluído` }, barra),
+            el('div', { class: 'rodape' },
+              el('span', { class: 'farol', dataset: { f: q.farol }, text: q.farol }),
+              el('span', { text: `${q.done} de ${q.total} atividades${q.overdue ? `, ${q.overdue} atrasada(s)` : ''}` })));
+        }))
+        : el('div', { class: 'vazio', text: podeCriar ? 'Nenhum projeto ainda. Crie o primeiro em “Novo projeto”.' : 'Você ainda não participa de nenhum projeto. Peça a um gestor para incluí-lo.' }),
+    );
+  }
+
+  async function carregarDiretorio() {
+    state.directory = await api('GET', '/users/directory');
+  }
+
+  function dialogoQuadro(b, membros = []) {
+    const f = {
+      code: el('input', { value: b?.code || '', maxlength: 20, placeholder: 'Gerado automaticamente' }),
+      name: el('input', { value: b?.name || '', maxlength: 120, required: true }),
+      description: el('textarea', { maxlength: 4000, value: b?.description || '' }),
+      area: el('input', { value: b?.area || '', maxlength: 120 }),
+      sponsor: el('input', { value: b?.sponsor || '', maxlength: 120 }),
+      ownerId: seletor([['', 'Sem responsável'], ...state.directory.map((u) => [u.id, u.name])], b?.owner_id ?? state.me.id),
+      priority: seletor(PRIORIDADES.map((p) => [p, p]), b?.priority || 'Média'),
+      startDate: el('input', { type: 'date', value: b?.start_date || '' }),
+      dueDate: el('input', { type: 'date', value: b?.due_date || '' }),
+    };
+    const ids = new Set(membros.map((m) => m.id));
+    const caixas = state.directory.map((u) => {
+      const cb = el('input', { type: 'checkbox', value: u.id, checked: ids.has(u.id) });
+      return { cb, label: el('label', {}, cb, `${u.name} (${ROLES[u.role]})`) };
+    });
+    const erro = el('p', { class: 'erro', role: 'alert' });
+    const corpo = [
+      el('div', { class: 'grade-2' }, campo('ID do projeto', f.code), campo('Prioridade', f.priority)),
+      campo('Nome do projeto', f.name), campo('Objetivo / descrição', f.description),
+      el('div', { class: 'grade-2' }, campo('Área solicitante', f.area), campo('Sponsor', f.sponsor),
+        campo('Início', f.startDate), campo('Fim previsto', f.dueDate)),
+      campo('Responsável', f.ownerId),
+      b ? el('div', { class: 'campo' }, el('span', { class: 'ajuda', text: 'Membros com acesso ao quadro' }), el('div', { class: 'membros' }, caixas.map((c) => c.label))) : null,
+      erro,
+    ];
+    const salvar = async () => {
+      erro.textContent = '';
+      const dados = {
+        name: f.name.value, description: f.description.value, area: f.area.value, sponsor: f.sponsor.value,
+        ownerId: f.ownerId.value ? Number(f.ownerId.value) : null, priority: f.priority.value,
+        startDate: f.startDate.value || null, dueDate: f.dueDate.value || null,
+      };
+      if (f.code.value.trim()) dados.code = f.code.value.trim();
+      try {
+        if (b) {
+          await api('PATCH', `/boards/${b.id}`, dados);
+          await api('PUT', `/boards/${b.id}/members`, { userIds: caixas.filter((c) => c.cb.checked).map((c) => Number(c.cb.value)) });
+          dlg.close(); aviso('Projeto atualizado.'); rotear();
+        } else {
+          const r = await api('POST', '/boards', dados);
+          dlg.close(); aviso('Projeto criado.'); location.hash = `#quadro-${r.id}`;
+        }
+      } catch (e) { erro.textContent = e.message; }
+    };
+    const arquivar = tentar(async () => {
+      if (!await confirmar('Arquivar este projeto? Ele sai da lista para todos os membros.')) return;
+      await api('DELETE', `/boards/${b.id}`); dlg.close(); aviso('Projeto arquivado.'); location.hash = '#quadros';
+    });
+    abrirDialogo(b ? 'Editar projeto' : 'Novo projeto', corpo, [
+      b ? el('button', { class: 'btn btn-perigo esq', type: 'button', text: 'Arquivar projeto', onclick: arquivar }) : null,
+      el('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: () => dlg.close() }),
+      el('button', { class: 'btn btn-primario', type: 'button', text: b ? 'Salvar alterações' : 'Criar projeto', onclick: salvar }),
+    ]);
+  }
+
+  // ---------- tela: quadro kanban + etiqueta ----------
+  let cartaoSel = null;
+
+  async function telaQuadro(id) {
+    const d = await api('GET', `/boards/${id}`);
+    const { board: b, permissions: perm } = d;
+    const listaDe = (c) => d.lists.find((x) => x.id === c.listId) || {};
+    if (!d.cards.some((c) => c.id === cartaoSel)) {
+      const escolhido = d.cards.find((c) => !listaDe(c).isDone && c.dueDate && c.dueDate < hoje())
+        || d.cards.find((c) => !listaDe(c).isDone) || d.cards[0];
+      cartaoSel = escolhido ? escolhido.id : null;
+    }
+    const barra = el('span'); barra.style.width = pct(b.pct);
+    const resumo = [b.code, b.area, b.owner_name && `Responsável: ${b.owner_name}`, b.due_date && `Fim previsto: ${fmtData(b.due_date)}`].filter(Boolean).join(' | ');
+    const painel = el('aside', { class: 'painel-etiqueta', 'aria-label': 'Etiqueta do cartão selecionado', 'aria-live': 'polite' });
+    const kanban = el('div', { class: 'kanban' }, d.lists.map((l) => coluna(l, d, perm, painel)),
+      perm.canEdit ? el('div', { class: 'nova-coluna' }, el('button', { class: 'btn', type: 'button', text: '+ Nova coluna',
+        onclick: tentar(async () => {
+          const nome = await pedirTexto('Nome da nova coluna'); if (!nome) return;
+          await api('POST', `/boards/${id}/lists`, { name: nome }); rotear();
+        }) })) : null);
+    const nCols = d.lists.length + (perm.canEdit ? 1 : 0);
+    kanban.style.gridTemplateColumns = `repeat(${d.lists.length}, minmax(200px, 1fr))${perm.canEdit ? ' 150px' : ''}`;
+    kanban.style.minWidth = `${d.lists.length * 200 + (perm.canEdit ? 150 : 0)}px`;
+    app.replaceChildren(
+      el('div', { class: 'cabecalho' },
+        el('div', {},
+          el('h1', { text: b.name }),
+          el('p', { text: resumo }),
+          el('p', {}, el('span', { class: 'farol', dataset: { f: b.farol }, text: `${b.farol}, ${pct(b.pct)} concluído` }))),
+        el('div', { class: 'acoes' },
+          perm.canManage ? el('button', { class: 'btn', type: 'button', text: 'Editar projeto e membros',
+            onclick: tentar(async () => { await carregarDiretorio(); dialogoQuadro(b, d.members); }) }) : null,
+          perm.canEdit && d.lists.length ? el('button', { class: 'btn btn-primario', type: 'button', text: 'Adicionar cartão',
+            onclick: () => dialogoCartao(null, d, d.lists[0].id) }) : null)),
+      el('div', { class: 'progresso', role: 'img', 'aria-label': `${pct(b.pct)} concluído` }, barra),
+      el('div', { class: 'oculto', id: 'instr-dnd', text: 'Selecione o cartão e use Avançar etapa ou Voltar etapa na etiqueta ao lado.' }),
+      el('div', { class: 'area-quadro' }, el('div', { class: 'kanban-rolagem' }, kanban), painel),
+    );
+    montarEtiqueta(painel, d, perm);
+  }
+
+  function estadoPrazo(c, lista) {
+    if (lista.isDone) return 'feito';
+    if (!c.dueDate) return '';
+    if (c.dueDate < hoje()) return 'atrasado';
+    const dias = (Date.parse(c.dueDate) - Date.parse(hoje())) / 86400000;
+    return dias <= 3 ? 'proximo' : '';
+  }
+  const diasAte = (data) => Math.round((Date.parse(data) - Date.parse(hoje())) / 86400000);
+
+  let arrastado = null;
+  function coluna(l, d, perm, painel) {
+    const cartoes = d.cards.filter((c) => c.listId === l.id);
+    const temAtraso = cartoes.some((c) => estadoPrazo(c, l) === 'atrasado');
+    const area = el('div', { class: 'cartoes', dataset: { list: l.id } }, cartoes.map((c) => cartao(c, l, d, perm, painel)));
+    if (!cartoes.length) {
+      area.append(el('div', { class: 'coluna-vazia' },
+        el('img', { src: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMzIiIGhlaWdodD0iNTIiIHZpZXdCb3g9IjAgMCAxMzIgNTIiIGZpbGw9Im5vbmUiPjxwYXRoIGQ9Ik0wIDI2aDQwTTkyIDI2aDIybDEwLTEwaDhNOTIgMzZoNDAiIHN0cm9rZT0iIzFDMzU1NiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48cmVjdCB4PSI0MCIgeT0iMTIiIHdpZHRoPSI1MiIgaGVpZ2h0PSIzMCIgcng9IjIiIHN0cm9rZT0iIzJBNEU3QyIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48cGF0aCBkPSJNNTAgMTJWNk02MiAxMlY2TTc0IDEyVjZNODYgMTJWNk01MCA0MnY2TTYyIDQydjZNNzQgNDJ2Nk04NiA0MnY2IiBzdHJva2U9IiMyQTRFN0MiIHN0cm9rZS13aWR0aD0iMS41Ii8+PGNpcmNsZSBjeD0iNCIgY3k9IjI2IiByPSIzIiBzdHJva2U9IiMyQTRFN0MiIHN0cm9rZS13aWR0aD0iMS41IiBmaWxsPSIjMEQxRDMxIi8+PC9zdmc+Cg==', alt: '', width: '132', height: '52' }),
+        el('p', { text: perm.canEdit ? 'Nenhum cartão aqui. Avance um cartão para cá.' : 'Nenhum cartão aqui.' })));
+    }
+    if (perm.canEdit) {
+      const marcador = el('div', { class: 'marcador' });
+      const indice = (y) => {
+        const itens = [...area.querySelectorAll('.cartao:not(.arrastando)')];
+        const i = itens.findIndex((n) => { const r = n.getBoundingClientRect(); return y < r.top + r.height / 2; });
+        return i === -1 ? itens.length : i;
+      };
+      area.addEventListener('dragover', (e) => {
+        if (!arrastado) return;
+        e.preventDefault(); area.classList.add('alvo');
+        const itens = [...area.querySelectorAll('.cartao:not(.arrastando)')];
+        const i = indice(e.clientY);
+        if (itens[i]) area.insertBefore(marcador, itens[i]); else area.append(marcador);
+      });
+      area.addEventListener('dragleave', (e) => { if (!area.contains(e.relatedTarget)) { area.classList.remove('alvo'); marcador.remove(); } });
+      area.addEventListener('drop', tentar(async (e) => {
+        e.preventDefault(); area.classList.remove('alvo'); marcador.remove();
+        if (!arrastado) return;
+        const idx = indice(e.clientY);
+        const cid = arrastado; arrastado = null;
+        cartaoSel = cid;
+        await api('PATCH', `/cards/${cid}/move`, { listId: l.id, index: idx });
+        rotear();
+      }));
+    }
+    const menu = perm.canEdit ? el('button', { class: 'btn btn-fantasma', type: 'button', 'aria-label': `Opções da coluna ${l.name}`, text: '⋯',
+      onclick: () => dialogoColuna(l, d) }) : null;
+    return el('section', { class: 'coluna', 'aria-label': l.isDone ? `${l.name} (coluna de conclusão)` : l.name,
+      title: l.isDone ? 'Cartões aqui contam como concluídos' : null },
+      el('div', { class: 'coluna-topo' },
+        el('h3', { text: l.name }),
+        el('span', { class: 'trilha', 'aria-hidden': 'true' }),
+        el('span', { class: 'via', 'aria-hidden': 'true', dataset: { estado: temAtraso ? 'atraso' : cartoes.length ? 'ativo' : 'vazio' } }),
+        el('span', { class: 'qtd', text: String(cartoes.length), 'aria-label': `${cartoes.length} cartões${temAtraso ? ', com atraso' : ''}` }),
+        menu),
+      area,
+      perm.canEdit ? el('button', { class: 'btn btn-fantasma novo-cartao', type: 'button', text: '+ Adicionar cartão',
+        onclick: () => dialogoCartao(null, d, l.id) }) : null);
+  }
+
+  function cartao(c, l, d, perm, painel) {
+    const prazo = estadoPrazo(c, l);
+    const prazoCurto = l.isDone ? 'feito' : !c.dueDate ? '' : prazo === 'atrasado' ? `-${-diasAte(c.dueDate)}d` : fmtData(c.dueDate).slice(0, 5);
+    const n = el('button', { class: 'cartao', type: 'button', draggable: perm.canEdit ? 'true' : null,
+      'aria-describedby': 'instr-dnd', 'aria-pressed': String(c.id === cartaoSel), dataset: { prazo, id: c.id },
+      onclick: () => {
+        cartaoSel = c.id;
+        app.querySelectorAll('.cartao').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.id === String(c.id))));
+        montarEtiqueta(painel, d, perm);
+      },
+      ondblclick: () => dialogoCartao(c, d) },
+      el('span', { class: 'linha-topo' }, el('span', { text: `#${c.id}` }),
+        el('span', { class: 'prazo', text: prazoCurto, 'aria-label': prazo === 'atrasado' ? `atrasado desde ${fmtData(c.dueDate)}` : null })),
+      el('span', { class: 'titulo', text: c.title }),
+      el('span', { class: 'resp', text: c.assigneeName || 'Sem responsável' }));
+    if (perm.canEdit) {
+      n.addEventListener('dragstart', (e) => { arrastado = c.id; n.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(c.id)); });
+      n.addEventListener('dragend', () => { n.classList.remove('arrastando'); arrastado = null; });
+    }
+    return n;
+  }
+
+  function montarEtiqueta(painel, d, perm) {
+    const c = d.cards.find((x) => x.id === cartaoSel);
+    if (!c) {
+      painel.replaceChildren(el('p', { class: 'painel-vazio', text: d.cards.length ? 'Selecione um cartão para ver os detalhes.' : 'Este quadro ainda não tem cartões.' }));
+      return;
+    }
+    const idx = d.lists.findIndex((l) => l.id === c.listId);
+    const lista = d.lists[idx];
+    const est = estadoPrazo(c, lista);
+    const dias = c.dueDate ? diasAte(c.dueDate) : null;
+    const prazoLongo = lista.isDone ? (c.dueDate ? `${fmtData(c.dueDate)}, concluído` : 'Concluído')
+      : !c.dueDate ? 'Sem prazo'
+        : dias < 0 ? `${fmtData(c.dueDate)}, atrasado há ${-dias} ${-dias === 1 ? 'dia' : 'dias'}`
+          : dias === 0 ? `${fmtData(c.dueDate)}, vence hoje`
+            : `${fmtData(c.dueDate)}, em ${dias} ${dias === 1 ? 'dia' : 'dias'}`;
+    const faixaTxt = est === 'atrasado' ? 'Atrasado' : est === 'feito' ? 'Entregue' : est === 'proximo' ? 'Vence logo' : c.dueDate ? 'No prazo' : 'Sem prazo';
+    const mover = (passo) => tentar(async () => {
+      const alvo = d.lists[idx + passo]; if (!alvo) return;
+      await api('PATCH', `/cards/${c.id}/move`, { listId: alvo.id, index: 100000 });
+      aviso(`#${c.id} movido para ${alvo.name}.`); rotear();
+    });
+    const campoEt = (rotulo, valor, extra = {}) => el('div', { class: extra.largo ? 'largo' : null },
+      el('dt', { text: rotulo }), el('dd', { class: extra.mono ? 'mono' : null, text: valor }));
+    painel.replaceChildren(
+      el('div', { class: 'faixa', dataset: { estado: est } }, el('strong', { text: lista.name }), el('span', { text: faixaTxt })),
+      el('div', { class: 'cabeca' }, el('span', { class: 'codigo', text: `#${c.id}` }), el('h2', { text: c.title })),
+      el('dl', {},
+        campoEt('Projeto', d.board.code, { mono: true }),
+        campoEt('Prioridade', c.priority),
+        campoEt('Responsável', c.assigneeName || 'Sem responsável'),
+        campoEt('Fase', c.phase || 'Sem fase'),
+        campoEt('Prazo', prazoLongo, { largo: true, mono: true })),
+      el('div', { class: 'corpo' },
+        c.description ? el('p', { class: 'descricao', text: c.description }) : null,
+        el('ol', { class: 'etapas', 'aria-label': 'Etapas do cartão' }, d.lists.map((l, i) =>
+          el('li', { class: i < idx ? 'passou' : null, 'aria-current': i === idx ? 'step' : null },
+            el('span', { class: 'no', 'aria-hidden': 'true' }, el('span', { class: 'pad' }), el('span', { class: 'seg' })),
+            el('span', { text: l.name })))),
+        perm.canEdit ? el('div', { class: 'botoes-2' },
+          el('button', { class: 'btn', type: 'button', text: 'Voltar etapa', disabled: idx === 0, onclick: mover(-1) }),
+          el('button', { class: 'btn btn-primario', type: 'button', text: 'Avançar etapa', disabled: idx === d.lists.length - 1, onclick: mover(1) })) : null,
+        el('button', { class: 'btn', type: 'button', text: perm.canEdit ? 'Editar cartão' : 'Ver detalhes', onclick: () => dialogoCartao(c, d) })));
+  }
+
+  function dialogoColuna(l, d) {
+    const nome = el('input', { value: l.name, maxlength: 80 });
+    const done = el('input', { type: 'checkbox', checked: !!l.isDone });
+    const pos = seletor(d.lists.map((x, i) => [i, `${i + 1}ª posição`]), d.lists.findIndex((x) => x.id === l.id));
+    const erro = el('p', { class: 'erro', role: 'alert' });
+    abrirDialogo('Coluna', [
+      campo('Nome', nome), campo('Posição no quadro', pos),
+      el('div', { class: 'campo' }, el('label', {}, done, ' Cartões nesta coluna contam como concluídos')),
+      erro,
+    ], [
+      el('button', { class: 'btn btn-perigo esq', type: 'button', text: 'Excluir coluna', onclick: async () => {
+        if (!await confirmar('Excluir esta coluna? Ela precisa estar vazia.')) return;
+        try { await api('DELETE', `/lists/${l.id}`); dlg.close(); rotear(); } catch (e) { erro.textContent = e.message; }
+      } }),
+      el('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: () => dlg.close() }),
+      el('button', { class: 'btn btn-primario', type: 'button', text: 'Salvar', onclick: async () => {
+        try { await api('PATCH', `/lists/${l.id}`, { name: nome.value, isDone: done.checked, index: Number(pos.value) }); dlg.close(); rotear(); }
+        catch (e) { erro.textContent = e.message; }
+      } }),
+    ]);
+  }
+
+  function dialogoCartao(c, d, listaInicial) {
+    const editavel = d.permissions.canEdit;
+    const f = {
+      title: el('input', { value: c?.title || '', maxlength: 200, required: true, disabled: !editavel }),
+      description: el('textarea', { maxlength: 10000, value: c?.description || '', disabled: !editavel }),
+      assigneeId: seletor([['', 'Sem responsável'], ...d.members.map((m) => [m.id, m.name])], c?.assigneeId),
+      dueDate: el('input', { type: 'date', value: c?.dueDate || '', disabled: !editavel }),
+      priority: seletor(PRIORIDADES.map((p) => [p, p]), c?.priority || 'Média'),
+      phase: seletor(FASES.map((p) => [p, p || 'Sem fase']), c?.phase || ''),
+      listId: seletor(d.lists.map((l) => [l.id, l.name]), c?.listId || listaInicial),
+    };
+    ['assigneeId', 'priority', 'phase', 'listId'].forEach((k) => { f[k].disabled = !editavel; });
+    const erro = el('p', { class: 'erro', role: 'alert' });
+    const corpo = [
+      campo('Título', f.title), campo('Descrição', f.description),
+      el('div', { class: 'grade-2' }, campo('Coluna', f.listId), campo('Responsável', f.assigneeId),
+        campo('Prazo', f.dueDate), campo('Prioridade', f.priority)),
+      campo('Fase do projeto', f.phase),
+      c ? el('p', { class: 'ajuda', text: `Última alteração em ${fmtHora(c.updatedAt)}` }) : null,
+      erro,
+    ];
+    const salvar = async () => {
+      erro.textContent = '';
+      const dados = { title: f.title.value, description: f.description.value, assigneeId: f.assigneeId.value ? Number(f.assigneeId.value) : null,
+        dueDate: f.dueDate.value || null, priority: f.priority.value, phase: f.phase.value };
+      try {
+        if (c) {
+          await api('PATCH', `/cards/${c.id}`, dados);
+          if (Number(f.listId.value) !== c.listId) await api('PATCH', `/cards/${c.id}/move`, { listId: Number(f.listId.value), index: 100000 });
+        } else {
+          await api('POST', `/boards/${d.board.id}/cards`, { ...dados, listId: Number(f.listId.value) });
+        }
+        dlg.close(); rotear();
+      } catch (e) { erro.textContent = e.message; }
+    };
+    const excluir = async () => {
+      if (!await confirmar('Excluir este cartão? Essa ação não pode ser desfeita.')) return;
+      try { await api('DELETE', `/cards/${c.id}`); dlg.close(); rotear(); } catch (e) { erro.textContent = e.message; }
+    };
+    abrirDialogo(c ? (editavel ? 'Editar cartão' : 'Cartão') : 'Novo cartão', corpo, editavel ? [
+      c ? el('button', { class: 'btn btn-perigo esq', type: 'button', text: 'Excluir cartão', onclick: excluir }) : null,
+      el('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: () => dlg.close() }),
+      el('button', { class: 'btn btn-primario', type: 'button', text: c ? 'Salvar cartão' : 'Criar cartão', onclick: salvar }),
+    ] : [el('button', { class: 'btn', type: 'button', text: 'Fechar', onclick: () => dlg.close() })]);
+    f.title.focus();
+  }
+
+  // ---------- tela: desempenho ----------
+  async function telaDesempenho() {
+    const d = await api('GET', '/dashboard');
+    const atrasados = d.boards.filter((b) => b.farol === 'Atrasado').length;
+    const pctGeral = d.totals.total ? d.totals.done / d.totals.total : 0;
+    const kpi = (valor, rotulo, alerta) => el('div', { class: 'kpi', dataset: { alerta: alerta ? '1' : '0' } }, el('strong', { text: valor }), el('span', { text: rotulo }));
+    const maxSemana = Math.max(1, ...d.throughput.map((t) => t.count));
+
+    const linhasProjetos = d.boards.map((b) => {
+      const barra = el('span'); barra.style.width = pct(b.pct);
+      return el('tr', {},
+        el('td', {}, el('a', { href: `#quadro-${b.id}`, text: `${b.code} ${b.name}` })),
+        el('td', { text: b.ownerName || '' }),
+        el('td', { text: b.priority }),
+        el('td', {}, el('span', { class: 'farol', dataset: { f: b.farol }, text: b.farol })),
+        el('td', { class: 'num' }, el('div', { class: 'pct-celula' }, el('div', { class: 'progresso', 'aria-hidden': 'true' }, barra), pct(b.pct))),
+        el('td', { class: 'num', text: `${b.done}/${b.total}` }),
+        el('td', { class: 'num', text: String(b.overdue) }),
+        el('td', { text: fmtData(b.dueDate) }));
+    });
+    const linhasPessoas = d.people.map((p) => el('tr', {},
+      el('td', { text: p.name }), el('td', { class: 'num', text: String(p.open) }), el('td', { class: 'num', text: String(p.overdue) }),
+      el('td', { class: 'num', text: String(p.done30) }), el('td', { class: 'num', text: p.done30 ? pct(p.onTime30 / p.done30) : '' })));
+
+    app.replaceChildren(
+      el('div', { class: 'cabecalho' }, el('div', {}, el('h1', { text: 'Desempenho' }),
+        el('p', { text: `Situação em ${fmtData(d.today)}. Farol segue a regra da planilha: atenção quando o prazo decorrido supera o avanço em mais de 20 pontos.` }))),
+      el('div', { class: 'kpis' },
+        kpi(String(d.boards.length), 'projetos ativos'),
+        kpi(pct(pctGeral), 'das atividades concluídas'),
+        kpi(String(d.totals.overdue), 'atividades atrasadas', d.totals.overdue > 0),
+        kpi(String(atrasados), 'projetos atrasados', atrasados > 0)),
+      el('section', { class: 'secao' }, el('h2', { text: 'Projetos' }),
+        d.boards.length ? el('div', { class: 'rolagem' }, el('table', {},
+          el('thead', {}, el('tr', {}, ['Projeto', 'Responsável', 'Prioridade', 'Farol', '% concluído', 'Atividades', 'Atrasadas', 'Fim previsto']
+            .map((h, i) => el('th', { class: i >= 4 && i <= 6 ? 'num' : null, text: h })))),
+          el('tbody', {}, linhasProjetos))) : el('p', { class: 'ajuda', text: 'Nenhum projeto visível para você.' })),
+      el('section', { class: 'secao' }, el('h2', { text: 'Entregas por semana (últimas 8)' }),
+        el('div', { class: 'barras', role: 'img', 'aria-label': d.throughput.map((t) => `${fmtData(t.weekEnding)}: ${t.count}`).join(', ') },
+          d.throughput.map((t) => { const i = el('i'); i.style.height = `${(t.count / maxSemana) * 100}%`;
+            return el('div', {}, el('b', { text: String(t.count) }), i, el('span', { text: fmtData(t.weekEnding).slice(0, 5) })); }))),
+      el('section', { class: 'secao' }, el('h2', { text: 'Pessoas' }),
+        linhasPessoas.length ? el('div', { class: 'rolagem' }, el('table', {},
+          el('thead', {}, el('tr', {}, ['Responsável', 'Em aberto', 'Atrasadas', 'Concluídas em 30 dias', 'No prazo']
+            .map((h, i) => el('th', { class: i ? 'num' : null, text: h })))),
+          el('tbody', {}, linhasPessoas))) : el('p', { class: 'ajuda', text: 'Atribua responsáveis aos cartões para ver o desempenho por pessoa.' })),
+    );
+  }
+
+  // ---------- tela: usuários (admin) ----------
+  async function telaUsuarios() {
+    const users = await api('GET', '/users');
+    const linha = (u) => {
+      const papel = seletor(Object.entries(ROLES), u.role);
+      papel.setAttribute('aria-label', `Perfil de ${u.name}`);
+      papel.addEventListener('change', tentar(async () => { await api('PATCH', `/users/${u.id}`, { role: papel.value }); aviso('Perfil alterado.'); rotear(); }));
+      const bloqueado = u.lockedUntil && u.lockedUntil > Date.now();
+      return el('tr', {},
+        el('td', { text: u.name }), el('td', { text: u.email }), el('td', {}, papel),
+        el('td', { text: !u.active ? 'Inativo' : bloqueado ? 'Bloqueado' : u.mustChangePassword ? 'Aguardando 1º acesso' : 'Ativo' }),
+        el('td', { text: fmtHora(u.lastLoginAt) }),
+        el('td', {},
+          el('button', { class: 'btn', type: 'button', text: 'Redefinir senha', onclick: tentar(async () => {
+            if (!await confirmar(`Gerar nova senha temporária para ${u.name}? As sessões abertas serão encerradas.`)) return;
+            const r = await api('POST', `/users/${u.id}/reset-password`); mostrarSenhaTemporaria(u.name, r.temporaryPassword); rotear();
+          }) }), ' ',
+          bloqueado ? el('button', { class: 'btn', type: 'button', text: 'Desbloquear', onclick: tentar(async () => { await api('POST', `/users/${u.id}/unlock`); rotear(); }) }) : null, ' ',
+          el('button', { class: u.active ? 'btn btn-perigo' : 'btn', type: 'button', text: u.active ? 'Desativar' : 'Reativar', onclick: tentar(async () => {
+            await api('PATCH', `/users/${u.id}`, { active: !u.active }); aviso(u.active ? 'Usuário desativado.' : 'Usuário reativado.'); rotear();
+          }) })));
+    };
+    app.replaceChildren(
+      el('div', { class: 'cabecalho' },
+        el('div', {}, el('h1', { text: 'Usuários' }), el('p', { text: 'Não há cadastro aberto: só o administrador cria acessos. Desative quem sair da empresa no mesmo dia.' })),
+        el('button', { class: 'btn btn-primario', type: 'button', text: 'Novo usuário', onclick: dialogoUsuario })),
+      el('section', { class: 'secao' }, el('div', { class: 'rolagem' }, el('table', {},
+        el('thead', {}, el('tr', {}, ['Nome', 'E-mail', 'Perfil', 'Situação', 'Último acesso', 'Ações'].map((h) => el('th', { text: h })))),
+        el('tbody', {}, users.map(linha))))),
+      el('section', { class: 'secao' }, el('h2', { text: 'Perfis' }),
+        el('p', { class: 'ajuda', text: 'Administrador: tudo, inclusive usuários e auditoria. Gestor: cria projetos e gerencia os quadros de que participa. Membro: cria e move cartões nos quadros de que participa. Leitor: apenas visualiza.' })),
+    );
+  }
+
+  function dialogoUsuario() {
+    const nome = el('input', { maxlength: 120, autocomplete: 'off' });
+    const email = el('input', { type: 'email', maxlength: 200, autocomplete: 'off' });
+    const papel = seletor(Object.entries(ROLES), 'membro');
+    const erro = el('p', { class: 'erro', role: 'alert' });
+    abrirDialogo('Novo usuário', [campo('Nome completo', nome), campo('E-mail corporativo', email), campo('Perfil', papel), erro], [
+      el('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: () => dlg.close() }),
+      el('button', { class: 'btn btn-primario', type: 'button', text: 'Criar usuário', onclick: async () => {
+        try {
+          const r = await api('POST', '/users', { name: nome.value, email: email.value, role: papel.value });
+          mostrarSenhaTemporaria(nome.value, r.temporaryPassword); telaUsuarios();
+        } catch (e) { erro.textContent = e.message; }
+      } }),
+    ]);
+    nome.focus();
+  }
+
+  // ---------- tela: auditoria (admin) ----------
+  async function telaAuditoria() {
+    const rows = await api('GET', '/dashboard/audit?limit=300');
+    app.replaceChildren(
+      el('div', { class: 'cabecalho' }, el('div', {}, el('h1', { text: 'Auditoria' }),
+        el('p', { text: 'Últimos 300 eventos: acessos, falhas de login, bloqueios, alterações de usuários, projetos e cartões.' }))),
+      el('section', { class: 'secao' }, el('div', { class: 'rolagem' }, el('table', {},
+        el('thead', {}, el('tr', {}, ['Data e hora', 'Usuário', 'Ação', 'Objeto', 'IP', 'Detalhes'].map((h) => el('th', { text: h })))),
+        el('tbody', {}, rows.map((r) => el('tr', {},
+          el('td', { text: fmtHora(r.at) }), el('td', { text: r.userEmail || '' }), el('td', { text: r.action }),
+          el('td', { text: r.entity ? `${r.entity} ${r.entityId ?? ''}` : '' }), el('td', { text: r.ip || '' }),
+          el('td', { class: 'ajuda', text: r.details || '' }))))))),
+    );
+  }
+
+  // ---------- alterar senha / sair ----------
+  function dialogoSenha() {
+    const atual = el('input', { type: 'password', autocomplete: 'current-password', maxlength: 128 });
+    const nova = el('input', { type: 'password', autocomplete: 'new-password', maxlength: 128 });
+    const conf = el('input', { type: 'password', autocomplete: 'new-password', maxlength: 128 });
+    const erro = el('p', { class: 'erro', role: 'alert' });
+    abrirDialogo('Alterar senha', [campo('Senha atual', atual), campo('Nova senha', nova, 'Mínimo de 12 caracteres, combinando 3 tipos: minúsculas, maiúsculas, números e símbolos.'),
+      campo('Confirme a nova senha', conf), el('p', { class: 'ajuda', text: 'Suas outras sessões abertas serão encerradas.' }), erro], [
+      el('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: () => dlg.close() }),
+      el('button', { class: 'btn btn-primario', type: 'button', text: 'Alterar senha', onclick: async () => {
+        if (nova.value !== conf.value) { erro.textContent = 'A confirmação não confere com a nova senha.'; return; }
+        try { await api('POST', '/auth/change-password', { currentPassword: atual.value, newPassword: nova.value }); dlg.close(); aviso('Senha alterada.'); }
+        catch (e) { erro.textContent = e.message; }
+      } }),
+    ]);
+    atual.focus();
+  }
+
+  document.getElementById('btn-senha').addEventListener('click', dialogoSenha);
+  document.getElementById('btn-sair').addEventListener('click', async () => {
+    try { await api('POST', '/auth/logout', {}); } finally { window.gpMostrarLogin(); }
+  });
+
+  // ---------- início ----------
+  (async () => {
+    try {
+      const r = await fetch('/api/auth/me', { credentials: 'same-origin' });
+      if (!r.ok) { window.gpMostrarLogin(); return; }
+      const d = await r.json();
+      state.me = d.user; state.csrf = d.csrfToken;
+      if (state.me.mustChangePassword) { window.gpMostrarLogin(); return; }
+      document.getElementById('nome-usuario').textContent = `${state.me.name} (${ROLES[state.me.role]})`;
+      await carregarDiretorio();
+      window.addEventListener('hashchange', rotear);
+      rotear();
+    } catch { window.gpMostrarLogin(); }
+  })();
+})();
+
+  </script>
+</body>
+</html>

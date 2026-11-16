@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Entrar | Gestão de Projetos</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="login-pagina">
+    <div class="login-caixa">
+      <div class="faixa-login"><img src="/img/logo.svg" alt="" width="22" height="22">Gestão de Projetos</div>
+      <form id="form-login" novalidate>
+        <h1>Entrar</h1>
+        <p>Use o e-mail e a senha fornecidos pelo administrador.</p>
+        <div class="campo">
+          <label for="email">E-mail corporativo</label>
+          <input id="email" name="email" type="email" autocomplete="username" required maxlength="200" autofocus>
+        </div>
+        <div class="campo">
+          <label for="senha">Senha</label>
+          <input id="senha" name="senha" type="password" autocomplete="current-password" required maxlength="128">
+        </div>
+        <p class="erro" id="erro-login" role="alert"></p>
+        <button class="btn btn-primario" type="submit">Entrar</button>
+        <p class="rodape-login">Esqueceu a senha? Peça ao administrador do sistema uma senha temporária.</p>
+      </form>
+
+      <form id="form-troca" hidden novalidate>
+        <h1>Crie sua senha</h1>
+        <p>Por segurança, troque a senha temporária antes de continuar.</p>
+        <div class="campo">
+          <label for="atual">Senha atual (temporária)</label>
+          <input id="atual" type="password" autocomplete="current-password" required maxlength="128">
+        </div>
+        <div class="campo">
+          <label for="nova">Nova senha</label>
+          <input id="nova" type="password" autocomplete="new-password" required maxlength="128" aria-describedby="regra">
+          <span class="ajuda" id="regra">Mínimo de 12 caracteres, combinando 3 tipos: minúsculas, maiúsculas, números e símbolos.</span>
+        </div>
+        <div class="campo">
+          <label for="confirma">Confirme a nova senha</label>
+          <input id="confirma" type="password" autocomplete="new-password" required maxlength="128">
+        </div>
+        <p class="erro" id="erro-troca" role="alert"></p>
+        <button class="btn btn-primario" type="submit">Salvar senha e entrar</button>
+      </form>
+    </div>
+  </div>
+  <script src="/login.js"></script>
+</body>
+</html>
