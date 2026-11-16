@@ -1,0 +1,26 @@
+{
+  "name": "gestao-projetos",
+  "version": "1.0.0",
+  "description": "Gestão de projetos em quadros (kanban) com painel de desempenho, login e trilha de auditoria.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "dev": "node --env-file-if-exists=.env --watch src/server.js",
+    "create-admin": "node --env-file-if-exists=.env scripts/create-admin.js",
+    "seed": "node --env-file-if-exists=.env scripts/seed.js",
+    "backup": "node --env-file-if-exists=.env scripts/backup.js",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "better-sqlite3": "13.0.3",
+    "cookie-parser": "1.4.7",
+    "express": "4.22.3",
+    "helmet": "8.3.0",
+    "zod": "4.6.7"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.9"
+  }
+}

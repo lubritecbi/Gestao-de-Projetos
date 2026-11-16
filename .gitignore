@@ -1,0 +1,21 @@
+# Dependências
+node_modules/
+
+# Banco de dados, backups e dados locais (nunca versionar)
+data/
+backups/
+*.db
+*.db-*
+*.sqlite
+
+# Configuração com segredos
+.env
+.env.*
+!.env.example
+
+# Sistema e editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,18 @@
+services:
+  gestao:
+    build: .
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      DB_PATH: /app/data/gestao.db
+    ports:
+      - "127.0.0.1:3000:3000"   # só acessível pelo proxy reverso no mesmo servidor
+    volumes:
+      - gestao-dados:/app/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+volumes:
+  gestao-dados:
