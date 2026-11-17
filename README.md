@@ -30,13 +30,36 @@ O GitHub Pages só hospeda arquivos estáticos. Por isso, nessa versão:
 | Login e senhas | Supabase Auth | cadastro público desligado; só o admin cria acessos |
 | Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql` |
 | Primeiro administrador | Supabase | `supabase/02_primeiro_admin.sql` |
+| Backup e manter ativo | GitHub Actions | `.github/workflows/backup-supabase.yml`, `supabase/04_restaurar_gatilho.sql` |
 | Gestão de usuários (admin) | Supabase Edge Function | `supabase/functions/admin-usuarios/index.ts` |
 
 **Quem decide as permissões é o banco**, não a página: as regras RLS conferem perfil, participação no quadro, usuário ativo e troca da senha temporária em cada consulta. A chave em `web/config.js` é a pública (anon/publishable) e pode ficar no GitHub; a chave secreta (service_role) existe só dentro da Edge Function. O fluxo de publicação bloqueia o envio se encontrar uma chave secreta.
 
-A publicação é automática pelo fluxo `.github/workflows/pages.yml` a cada envio na `main` que altere `web/` ou `docs/demo/`. Em **Settings > Pages > Build and deployment > Source** deve estar selecionado **GitHub Actions**.
+A publicação é automática pelo fluxo `.github/workflows/Pages.yml` a cada envio na `main` que altere `web/` ou `docs/demo/` (também pode ser rodado em **Actions > Publicar no GitHub Pages > Run workflow**). Em **Settings > Pages > Build and deployment > Source** deve estar selecionado **GitHub Actions**, e o campo **Custom domain** deve ficar vazio.
 
-Diferenças em relação à versão com servidor próprio: o bloqueio por tentativas erradas e os limites de acesso são os do Supabase (não os 5 erros / 15 minutos); a saída por 30 minutos de inatividade é feita pela página; o projeto gratuito do Supabase pausa após cerca de 7 dias sem acesso (os dados são mantidos).
+Diferenças em relação à versão com servidor próprio: o bloqueio por tentativas erradas e os limites de acesso são os do Supabase (não os 5 erros / 15 minutos); a saída por 30 minutos de inatividade é feita pela página; o projeto gratuito do Supabase pausa após cerca de 7 dias sem acesso (os dados são mantidos), o que a tarefa de backup abaixo evita.
+
+A senha de um usuário não pode ser lida, só substituída: pelo botão **Redefinir senha** na tela Usuários ou, para o administrador, no SQL Editor do Supabase com `update auth.users set encrypted_password = extensions.crypt('NovaSenha', extensions.gen_salt('bf')) where email = '...'`.
+
+### Backup e restauração (Supabase)
+
+O fluxo `.github/workflows/backup-supabase.yml` roda segunda, quarta e sexta de madrugada. Ele conecta no banco (o que mantém o projeto gratuito ativo) e gera um backup **criptografado com AES-256**, guardado por 30 dias na aba **Actions** (execução > **Artifacts**). Como o repositório é público, sem a senha o arquivo é inútil.
+
+Configuração única, em **Settings > Secrets and variables > Actions > New repository secret**:
+
+| Segredo | Valor |
+|---|---|
+| `SUPABASE_DB_URL` | Supabase > **Connect** > **Session pooler** > URI, trocando `[YOUR-PASSWORD]` pela senha do banco |
+| `BACKUP_PASSPHRASE` | Uma frase longa (20+ caracteres). **Guarde fora do GitHub**: sem ela não há como abrir os backups |
+
+Restaurar (num projeto novo ou após um problema):
+
+1. Baixe o artifact e descriptografe: `gpg -d gestao-supabase-AAAA-MM-DD_HHMM.tar.gz.gpg | tar -xz` (no Windows, use o Gpg4win e o 7-Zip). Saem `02_logins.sql`, `01_sistema.sql` e `resumo.txt`.
+2. Rode, nesta ordem, no SQL Editor (ou com `psql`): `02_logins.sql`, `01_sistema.sql` e `supabase/04_restaurar_gatilho.sql`. Se algum passo der erro, pare: as regras de permissão são aplicadas no fim do `01_sistema.sql`.
+3. Confira os totais mostrados pelo `04_restaurar_gatilho.sql` com o `resumo.txt`.
+4. Se for um projeto novo: republique a Edge Function, refaça as configurações de Authentication (cadastro público desligado, política de senha, Site URL) e atualize `web/config.js` com a nova Project URL e chave pública.
+
+Atenção: o GitHub desliga tarefas agendadas de repositórios públicos após 60 dias sem nenhum commit e avisa por e-mail. Se isso acontecer, reative em **Actions > Backup do Supabase > Enable workflow**.
 
 Para rodar com servidor próprio (Node.js + SQLite), siga as seções de instalação abaixo.
 
