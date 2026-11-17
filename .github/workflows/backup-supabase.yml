@@ -47,36 +47,45 @@ jobs:
             exit 1
           fi
 
-      # O pg_dump precisa ser da mesma versão (ou mais nova) que o banco do Supabase
-      - name: Instalar cliente PostgreSQL 17
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-common >/dev/null
-          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
-          sudo apt-get install -y -qq postgresql-client-17 >/dev/null
-          /usr/lib/postgresql/17/bin/pg_dump --version
-
       - name: Gerar backup criptografado
         run: |
           set -euo pipefail
           umask 077
-          PG=/usr/lib/postgresql/17/bin
           DATA=$(date -u +%Y-%m-%d_%H%M)
           mkdir -p saida tmp
+          chmod 777 tmp   # o contêiner do PostgreSQL grava aqui
 
-          # 1) Estrutura + dados do sistema (tabelas, regras de permissão, funções)
-          $PG/pg_dump "$SUPABASE_DB_URL" --no-owner \
-            --schema=public --schema=privado --file=tmp/01_sistema.sql
-          # Projeto novo do Supabase já tem o esquema "public": não recriar
-          sed -i 's/^CREATE SCHEMA public;/CREATE SCHEMA IF NOT EXISTS public;/' tmp/01_sistema.sql
+          # Roda as ferramentas do PostgreSQL pela imagem oficial (funciona em qualquer
+          # versão do Ubuntu do GitHub). A senha vai por variável, nunca na linha de comando.
+          pg() { docker run --rm -e DBURL="$SUPABASE_DB_URL" -e PGCONNECT_TIMEOUT=30 -v "$PWD/tmp:/out" "$1" sh -c "$2"; }
+
+          # Usa a mesma versão principal do banco do Supabase (ex.: 17)
+          VERSAO=$(pg postgres:17-alpine 'psql "$DBURL" -tAc "show server_version_num"' | tr -d '[:space:]' | cut -c1-2)
+          echo "Versão do banco: $VERSAO"
+          IMG="postgres:${VERSAO}-alpine"
+
+          # 1) Estrutura + dados do sistema (tabelas, regras de permissão, funções).
+          #    --inserts: comandos INSERT simples, que podem ser colados no SQL Editor.
+          pg "$IMG" 'pg_dump "$DBURL" --no-owner --inserts --schema=public --schema=privado -f /out/01_sistema.sql'
           # 2) Logins (usuários do Supabase Auth, com as senhas já embaralhadas)
-          $PG/pg_dump "$SUPABASE_DB_URL" --data-only --no-owner \
-            --table=auth.users --table=auth.identities --file=tmp/02_logins.sql
+          pg "$IMG" 'pg_dump "$DBURL" --data-only --no-owner --inserts --table=auth.users --table=auth.identities -f /out/02_logins.sql'
           # 3) Resumo para conferência (sem dados pessoais)
-          $PG/psql "$SUPABASE_DB_URL" -tAc "select 'quadros='||(select count(*) from public.boards)||' cartoes='||(select count(*) from public.cards)||' usuarios='||(select count(*) from public.profiles)||' auditoria='||(select count(*) from public.audit_log)" > tmp/resumo.txt
+          cat > tmp/resumo.sql <<'SQL'
+          select 'quadros=' || (select count(*) from public.boards)
+              || ' cartoes=' || (select count(*) from public.cards)
+              || ' usuarios=' || (select count(*) from public.profiles)
+              || ' auditoria=' || (select count(*) from public.audit_log);
+          SQL
+          pg "$IMG" 'psql "$DBURL" -tA -f /out/resumo.sql > /out/resumo.txt'
+
+          # Ajustes para o arquivo rodar no SQL Editor de um projeto novo:
+          #  - remove as linhas \restrict / \unrestrict (comandos só do programa psql)
+          #  - o esquema "public" já existe em projeto novo
+          sed -i -E '/^\\(un)?restrict /d' tmp/01_sistema.sql tmp/02_logins.sql
+          sed -i 's/^CREATE SCHEMA public;/CREATE SCHEMA IF NOT EXISTS public;/' tmp/01_sistema.sql
           echo "Resumo do backup: $(cat tmp/resumo.txt)"
 
-          tar -C tmp -czf - . | gpg --batch --yes --symmetric --cipher-algo AES256 \
+          tar -C tmp -czf - 01_sistema.sql 02_logins.sql resumo.txt | gpg --batch --yes --symmetric --cipher-algo AES256 \
             --passphrase-fd 3 3<<<"$BACKUP_PASSPHRASE" \
             -o "saida/gestao-supabase-$DATA.tar.gz.gpg"
           rm -rf tmp
