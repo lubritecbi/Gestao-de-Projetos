@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Gestão de Projetos</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-in">
+      <a class="marca" href="#/"><img src="img/logo.svg" alt="" width="26" height="26">Gestão de Projetos</a>
+      <nav class="nav" id="nav" aria-label="Principal"></nav>
+      <div class="usuario">
+        <span id="nome-usuario"></span>
+        <button class="btn btn-fantasma" id="btn-senha" type="button">Alterar senha</button>
+        <button class="btn btn-fantasma" id="btn-sair" type="button">Sair</button>
+      </div>
+    </div>
+  </header>
+  <main id="app" tabindex="-1"></main>
+  <dialog id="dlg" aria-labelledby="dlg-titulo"></dialog>
+  <dialog id="dlg-conf" aria-label="Confirmação"></dialog>
+  <script src="vendor/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="api-supabase.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

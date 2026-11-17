@@ -12,7 +12,33 @@ Os três projetos iniciais (Roteirizador, Validação de IPE Logística e Valida
 
 ## Demonstração sem instalar
 
-O arquivo `docs/demo/index.html` é uma versão de demonstração que roda só no navegador: abra com dois cliques. Os dados ficam no próprio navegador e não há segurança real nela; serve para apresentar o sistema. Se ativar o GitHub Pages apontando para a pasta `docs`, ela fica disponível em `https://<usuario>.github.io/<repositorio>/demo/` (só faça isso se o conteúdo puder ser público).
+| Endereço | O que é |
+|---|---|
+| https://lubritecbi.github.io/Gestao-de-Projetos/ | **Plataforma em uso**: telas no GitHub Pages, login, banco e permissões no Supabase (plano gratuito) |
+| https://lubritecbi.github.io/Gestao-de-Projetos/demo/ | Demonstração: dados só no navegador, sem segurança real (senha de exemplo `Demo#2026-Teste`) |
+
+A demonstração também pode ser aberta com dois cliques em `docs/demo/index.html`.
+
+## Versão GitHub Pages + Supabase
+
+O GitHub Pages só hospeda arquivos estáticos. Por isso, nessa versão:
+
+| Parte | Onde fica | Arquivos |
+|---|---|---|
+| Telas | GitHub Pages | `web/` (mesmas telas de `public/`, com caminhos relativos) |
+| Ponte telas → Supabase | GitHub Pages | `web/api-supabase.js` responde às chamadas `/api/...` das telas usando o Supabase |
+| Login e senhas | Supabase Auth | cadastro público desligado; só o admin cria acessos |
+| Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql` |
+| Primeiro administrador | Supabase | `supabase/02_primeiro_admin.sql` |
+| Gestão de usuários (admin) | Supabase Edge Function | `supabase/functions/admin-usuarios/index.ts` |
+
+**Quem decide as permissões é o banco**, não a página: as regras RLS conferem perfil, participação no quadro, usuário ativo e troca da senha temporária em cada consulta. A chave em `web/config.js` é a pública (anon/publishable) e pode ficar no GitHub; a chave secreta (service_role) existe só dentro da Edge Function. O fluxo de publicação bloqueia o envio se encontrar uma chave secreta.
+
+A publicação é automática pelo fluxo `.github/workflows/pages.yml` a cada envio na `main` que altere `web/` ou `docs/demo/`. Em **Settings > Pages > Build and deployment > Source** deve estar selecionado **GitHub Actions**.
+
+Diferenças em relação à versão com servidor próprio: o bloqueio por tentativas erradas e os limites de acesso são os do Supabase (não os 5 erros / 15 minutos); a saída por 30 minutos de inatividade é feita pela página; o projeto gratuito do Supabase pausa após cerca de 7 dias sem acesso (os dados são mantidos).
+
+Para rodar com servidor próprio (Node.js + SQLite), siga as seções de instalação abaixo.
 
 ## O que o sistema faz
 
