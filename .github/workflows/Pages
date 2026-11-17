@@ -1,0 +1,62 @@
+# Publica no GitHub Pages:
+#   https://lubritecbi.github.io/Gestao-de-Projetos/       -> plataforma (pasta web/, dados no Supabase)
+#   https://lubritecbi.github.io/Gestao-de-Projetos/demo/  -> demonstração (pasta docs/demo, dados só no navegador)
+# Roda a cada envio (push) na main que altere essas pastas, ou manualmente pela aba Actions.
+# O GitHub Pages só hospeda arquivos estáticos; login, banco e permissões ficam no Supabase.
+name: Publicar no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'docs/demo/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Trava de segurança: impede publicar a chave secreta do Supabase por engano.
+      - name: Conferir que não há chave secreta no site
+        run: |
+          node -e '
+            const fs = require("fs");
+            const txt = fs.readFileSync("web/config.js", "utf8");
+            if (/COLE_AQUI/.test(txt)) { console.log("::error::Preencha web/config.js com a Project URL e a chave anon/publishable."); process.exit(1); }
+            if (/sb_secret_/.test(txt)) { console.log("::error::web/config.js tem uma chave SECRETA. Use a anon/publishable."); process.exit(1); }
+            for (const jwt of txt.match(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g) || []) {
+              const role = JSON.parse(Buffer.from(jwt.split(".")[1], "base64url")).role;
+              if (role !== "anon") { console.log("::error::web/config.js tem uma chave com papel " + role + ". Use a anon."); process.exit(1); }
+            }
+            console.log("Chave pública conferida.");
+          '
+
+      - name: Montar o site
+        run: |
+          mkdir -p _site/demo
+          cp -r web/. _site/
+          cp -r docs/demo/. _site/demo/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4
