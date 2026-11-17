@@ -1,0 +1,91 @@
+# Backup do banco no Supabase + mantém o projeto gratuito "acordado".
+# ---------------------------------------------------------------------
+# Por quê: o plano gratuito do Supabase pausa o projeto após ~7 dias sem
+# uso. Esta tarefa conecta no banco 3 vezes por semana (o que conta como
+# uso) e, no mesmo passo, gera um backup.
+#
+# Segurança: o repositório é PÚBLICO e os arquivos gerados pelo Actions
+# podem ser baixados por qualquer conta do GitHub. Por isso o backup é
+# CRIPTOGRAFADO com senha (AES-256) antes de sair da máquina. Sem a senha,
+# o arquivo é inútil.
+#
+# Segredos necessários (Settings > Secrets and variables > Actions):
+#   SUPABASE_DB_URL     -> string de conexão "Session pooler" do Supabase, com a senha do banco
+#   BACKUP_PASSPHRASE   -> senha longa para criptografar o backup (guarde fora do GitHub!)
+#
+# Como restaurar: veja a seção "Backup e restauração" do README.
+name: Backup do Supabase
+
+on:
+  schedule:
+    - cron: '23 6 * * 1,3,5'   # seg, qua e sex às 06:23 UTC (03:23 em Brasília)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-supabase
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Conferir segredos
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::Cadastre os segredos SUPABASE_DB_URL e BACKUP_PASSPHRASE em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          if [ ${#BACKUP_PASSPHRASE} -lt 20 ]; then
+            echo "::error::BACKUP_PASSPHRASE muito curta. Use pelo menos 20 caracteres."
+            exit 1
+          fi
+
+      # O pg_dump precisa ser da mesma versão (ou mais nova) que o banco do Supabase
+      - name: Instalar cliente PostgreSQL 17
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-client-17 >/dev/null
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Gerar backup criptografado
+        run: |
+          set -euo pipefail
+          umask 077
+          PG=/usr/lib/postgresql/17/bin
+          DATA=$(date -u +%Y-%m-%d_%H%M)
+          mkdir -p saida tmp
+
+          # 1) Estrutura + dados do sistema (tabelas, regras de permissão, funções)
+          $PG/pg_dump "$SUPABASE_DB_URL" --no-owner \
+            --schema=public --schema=privado --file=tmp/01_sistema.sql
+          # Projeto novo do Supabase já tem o esquema "public": não recriar
+          sed -i 's/^CREATE SCHEMA public;/CREATE SCHEMA IF NOT EXISTS public;/' tmp/01_sistema.sql
+          # 2) Logins (usuários do Supabase Auth, com as senhas já embaralhadas)
+          $PG/pg_dump "$SUPABASE_DB_URL" --data-only --no-owner \
+            --table=auth.users --table=auth.identities --file=tmp/02_logins.sql
+          # 3) Resumo para conferência (sem dados pessoais)
+          $PG/psql "$SUPABASE_DB_URL" -tAc "select 'quadros='||(select count(*) from public.boards)||' cartoes='||(select count(*) from public.cards)||' usuarios='||(select count(*) from public.profiles)||' auditoria='||(select count(*) from public.audit_log)" > tmp/resumo.txt
+          echo "Resumo do backup: $(cat tmp/resumo.txt)"
+
+          tar -C tmp -czf - . | gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase-fd 3 3<<<"$BACKUP_PASSPHRASE" \
+            -o "saida/gestao-supabase-$DATA.tar.gz.gpg"
+          rm -rf tmp
+          ls -lh saida
+
+      - name: Guardar backup (30 dias)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-supabase-${{ github.run_number }}
+          path: saida/*.gpg
+          retention-days: 30
+          if-no-files-found: error
