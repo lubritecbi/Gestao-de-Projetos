@@ -29,6 +29,8 @@
   --azul-texto: #93B8FF;
   --vermelho: #C8232C;
   --vermelho-texto: #FF8287;
+  --verde: #17783F;
+  --verde-texto: #6FDC9A;
   --ambar: #F5C35E;
   --raio: 2px;
   --fonte: "Chivo", "Segoe UI", system-ui, sans-serif;
@@ -110,7 +112,8 @@ main:focus { outline: none; }
 /* Farol: a cor nunca vem sozinha — sempre com o texto do estado */
 .farol { display: inline-flex; align-items: center; gap: .45rem; font-size: .85rem; font-weight: 600; white-space: nowrap; color: var(--azul-texto); }
 .farol::before { content: ""; width: .6rem; height: .6rem; border-radius: 50%; border: 1.5px solid currentColor; }
-.farol[data-f="No prazo"], .farol[data-f="Concluído"] { color: var(--azul-texto); }
+.farol[data-f="No prazo"] { color: var(--azul-texto); }
+.farol[data-f="Concluído"] { color: var(--verde-texto); }
 .farol[data-f="Concluído"]::before { background: currentColor; }
 .farol[data-f="Atenção"] { color: var(--ambar); }
 .farol[data-f="Atrasado"] { color: var(--vermelho-texto); }
@@ -145,7 +148,7 @@ main:focus { outline: none; }
 .cartao .prazo { font-weight: 600; }
 .cartao[data-prazo="atrasado"] .prazo { color: var(--vermelho-texto); }
 .cartao[data-prazo="proximo"] .prazo { color: var(--ambar); }
-.cartao[data-prazo="feito"] .prazo { color: var(--azul-texto); }
+.cartao[data-prazo="feito"] .prazo { color: var(--verde-texto); }
 .cartao .titulo { font-weight: 600; line-height: 1.35; }
 .cartao .resp { font-size: .82rem; color: var(--texto-2); }
 .marcador { height: 2px; background: var(--azul-claro); }
@@ -158,7 +161,7 @@ main:focus { outline: none; }
 .painel-etiqueta { flex: 1 1 360px; max-width: 100%; background: var(--etiqueta); border: 1px solid var(--linha); border-radius: 3px; overflow: hidden; position: sticky; top: 80px; }
 .painel-etiqueta .faixa { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .75rem 1.1rem; background: #1B3B6E; color: #fff; }
 .painel-etiqueta .faixa[data-estado="atrasado"] { background: var(--vermelho); }
-.painel-etiqueta .faixa[data-estado="feito"] { background: #1E4FAE; }
+.painel-etiqueta .faixa[data-estado="feito"] { background: var(--verde); }
 .painel-etiqueta .faixa strong { font-size: 1.1rem; font-weight: 800; }
 .painel-etiqueta .faixa span { font-family: var(--mono); font-weight: 600; }
 .painel-etiqueta .cabeca { padding: 1.1rem 1.1rem .3rem; display: grid; gap: .35rem; }
