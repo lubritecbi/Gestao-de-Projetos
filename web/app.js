@@ -265,7 +265,7 @@
     const area = el('div', { class: 'cartoes', dataset: { list: l.id } }, cartoes.map((c) => cartao(c, l, d, perm, painel)));
     if (!cartoes.length) {
       area.append(el('div', { class: 'coluna-vazia' },
-        el('img', { src: '/img/chip-vazio.svg', alt: '', width: '132', height: '52' }),
+        el('img', { src: 'img/chip-vazio.svg', alt: '', width: '132', height: '52' }),
         el('p', { text: perm.canEdit ? 'Nenhum cartão aqui. Avance um cartão para cá.' : 'Nenhum cartão aqui.' })));
     }
     if (perm.canEdit) {
