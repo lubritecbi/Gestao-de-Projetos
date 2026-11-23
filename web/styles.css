@@ -147,6 +147,35 @@ main:focus { outline: none; }
 .cartao[data-prazo="feito"] .prazo { color: var(--verde-texto); }
 .cartao .titulo { font-weight: 600; line-height: 1.35; }
 .cartao .resp { font-size: .82rem; color: var(--texto-2); }
+/* Checklists: contador no cartão (verde quando tudo está marcado) e editor na janela do cartão */
+.cartao .linha-base { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.check { display: inline-flex; align-items: center; gap: .35rem; font-family: var(--mono); font-size: .75rem; font-weight: 600; color: var(--texto-2); white-space: nowrap; }
+.check::before { content: ""; width: .65rem; height: .65rem; border: 1.5px solid currentColor; border-radius: 1px; }
+.check[data-completo="1"] { color: var(--verde-texto); }
+.check[data-completo="1"]::before { background: currentColor; }
+.progresso[data-completo="1"] > span { background: var(--verde-texto); }
+.checklists { display: grid; gap: 1rem; border-top: 1px solid var(--linha); padding-top: .8rem; margin-bottom: .9rem; }
+.checklists-topo { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.checklists-topo .rotulo { font-size: .85rem; font-weight: 600; color: var(--texto-2); }
+.checklists-topo .btn { min-height: 36px; }
+.checklist { display: grid; gap: .45rem; }
+.checklist-cab { display: flex; align-items: center; gap: .5rem; }
+.checklist-cab .btn { min-height: 32px; padding: 0 .5rem; }
+.checklist-cab .btn-perigo { color: var(--vermelho-texto); }
+.checklist-titulo { flex: 1; min-width: 0; font-weight: 700; }
+.checklist input:not([type="checkbox"]) { width: 100%; min-width: 0; border: 1px solid transparent; border-radius: var(--raio); padding: .35rem .5rem; background: transparent; color: var(--texto); font: inherit; }
+.checklist input:not([type="checkbox"]):hover { border-color: var(--via); }
+.checklist input:not([type="checkbox"]):focus { border-color: var(--linha); background: var(--placa); }
+.checklist input.checklist-titulo { font-weight: 700; }
+.checklist input.novo-item { border-color: var(--linha); background: var(--placa); }
+.checklist-itens { list-style: none; margin: 0; padding: 0; display: grid; gap: .1rem; }
+.checklist-itens li { display: flex; align-items: center; gap: .5rem; }
+.checklist-itens input[type="checkbox"] { flex: none; }
+.checklist-itens li[data-feito="1"] .item-texto { color: var(--texto-2); text-decoration: line-through; }
+.checklist-itens span.item-texto { padding: .35rem .5rem; overflow-wrap: anywhere; }
+.checklist-itens .btn { min-height: 32px; padding: 0 .5rem; flex: none; }
+.novo-item-linha { display: flex; gap: .5rem; }
+.novo-item-linha .btn { min-height: 36px; flex: none; }
 .marcador { height: 2px; background: var(--azul-claro); }
 .coluna-vazia { display: grid; justify-items: center; gap: .6rem; padding: 1.6rem .5rem; text-align: center; }
 .coluna-vazia p { margin: 0; color: var(--texto-2); font-size: .82rem; max-width: 22ch; }

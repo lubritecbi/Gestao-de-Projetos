@@ -132,6 +132,23 @@ test('validação rejeita campos desconhecidos e IDs inválidos', async () => {
   assert.equal((await admin.req('POST', '/api/boards', { name: 'A', dueDate: '2026-13-45' })).status, 400);
 });
 
+test('checklists: membro grava e marca, leitor não altera, formato inválido é recusado', async () => {
+  const cl = [{ title: 'Testes', items: [{ text: 'Rodar piloto', done: true }, { text: 'Validar rotas', done: false }, { text: '   ', done: false }] }];
+  assert.equal((await membro.req('PATCH', `/api/cards/${cardId}`, { checklists: cl })).status, 200);
+  const view = await membro.req('GET', `/api/boards/${boardId}`);
+  const card = view.data.cards.find((x) => x.id === cardId);
+  assert.deepEqual(card.checklists, [{ title: 'Testes', items: [{ text: 'Rodar piloto', done: true }, { text: 'Validar rotas', done: false }] }],
+    'item sem texto é descartado');
+  assert.equal((await leitor.req('PATCH', `/api/cards/${cardId}`, { checklists: [] })).status, 403, 'leitor não altera checklist');
+  assert.equal((await membro.req('PATCH', `/api/cards/${cardId}`, { checklists: [{ title: 'x', items: 'não é lista' }] })).status, 400);
+  assert.equal((await membro.req('PATCH', `/api/cards/${cardId}`, { checklists: Array.from({ length: 11 }, () => ({ title: 'x', items: [] })) })).status, 400,
+    'no máximo 10 checklists');
+  const novo = await membro.req('POST', `/api/boards/${boardId}/cards`, { listId: listIds[0], title: 'Com checklist', checklists: [{ title: '', items: [] }] });
+  assert.equal(novo.status, 201);
+  const v2 = await membro.req('GET', `/api/boards/${boardId}`);
+  assert.deepEqual(v2.data.cards.find((x) => x.id === novo.data.id).checklists, [{ title: 'Checklist', items: [] }], 'nome vazio vira "Checklist"');
+});
+
 test('somente admin acessa usuários e auditoria', async () => {
   assert.equal((await membro.req('GET', '/api/users')).status, 403);
   assert.equal((await membro.req('GET', '/api/dashboard/audit')).status, 403);

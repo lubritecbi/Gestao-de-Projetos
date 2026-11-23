@@ -140,6 +140,16 @@
   const SO_VER = 'Seu perfil permite apenas visualizar este quadro.';
   const SO_GESTOR = 'Apenas gestores do quadro ou administradores podem fazer isso.';
   const num = (v) => { const n = Number(v); exigir(Number.isInteger(n) && n > 0, 400, 'Dados inválidos.'); return n; };
+  // Checklists do cartão: até 10 por cartão, até 30 itens cada. Itens sem texto são descartados.
+  function limparChecklists(v) {
+    exigir(Array.isArray(v) && v.length <= 10, 400, 'Cada cartão pode ter no máximo 10 checklists.');
+    return v.map((cl) => {
+      const itens = Array.isArray(cl?.items) ? cl.items : [];
+      exigir(itens.length <= 30, 400, 'Cada checklist pode ter no máximo 30 itens.');
+      return { title: String(cl?.title ?? '').trim().slice(0, 80) || 'Checklist',
+        items: itens.map((i) => ({ text: String(i?.text ?? '').trim().slice(0, 200), done: i?.done === true })).filter((i) => i.text) };
+    });
+  }
   const uuid = (v) => { exigir(typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v), 400, 'Dados inválidos.'); return v; };
 
   // ---------- rotas (mesmas da API original) ----------
@@ -257,7 +267,8 @@
           lists: ok(ql).map((l) => ({ id: l.id, name: l.name, position: l.position, isDone: l.is_done })),
           cards: ok(qc).map((c) => ({ id: c.id, listId: c.list_id, title: c.title, description: c.description,
             assigneeId: c.assignee_id, assigneeName: c.assignee?.name ?? null, dueDate: c.due_date, priority: c.priority,
-            phase: c.phase, position: c.position, completedAt: ms(c.completed_at), updatedAt: ms(c.updated_at) })),
+            phase: c.phase, checklists: Array.isArray(c.checklists) ? c.checklists : [],
+            position: c.position, completedAt: ms(c.completed_at), updatedAt: ms(c.updated_at) })),
           members: membros,
         };
       }
@@ -283,6 +294,7 @@
         const r = ok(await sb.from('cards').insert({
           board_id: boardId, list_id: num(body.listId), title: body.title, description: body.description || '',
           assignee_id: body.assigneeId || null, due_date: body.dueDate || null, priority: body.priority || 'Média', phase: body.phase || '',
+          checklists: limparChecklists(body.checklists ?? []),
         }).select('id').single(), SO_VER);
         return { id: r.id };
       }
@@ -313,6 +325,7 @@
         const mapa = { title: 'title', description: 'description', assigneeId: 'assignee_id', dueDate: 'due_date', priority: 'priority', phase: 'phase' };
         const v = {};
         for (const [k, col] of Object.entries(mapa)) if (body[k] !== undefined) v[col] = (body[k] === '' && ANULAVEIS.has(col)) ? null : body[k];
+        if (body.checklists !== undefined) v.checklists = limparChecklists(body.checklists);
         if (Object.keys(v).length) await atualizar('cards', v, id, SO_VER);
         return { ok: true };
       }

@@ -78,6 +78,7 @@ router.patch('/cards/:id', (req, res, next) => {
     const map = { title: 'title', description: 'description', assigneeId: 'assignee_id', dueDate: 'due_date', priority: 'priority', phase: 'phase' };
     const sets = []; const vals = [];
     for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { sets.push(`${col} = ?`); vals.push(d[k]); }
+    if (d.checklists !== undefined) { sets.push('checklists = ?'); vals.push(JSON.stringify(d.checklists)); }
     if (sets.length) {
       db.prepare(`UPDATE cards SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).run(...vals, Date.now(), card.id);
       audit(req, 'cartao.alterado', { entity: 'card', entityId: card.id, details: Object.keys(d) });

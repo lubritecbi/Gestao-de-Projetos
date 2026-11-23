@@ -93,8 +93,9 @@ router.get('/:id', (req, res, next) => {
     const access = boardAccess(req.user, boardId);
     const lists = db.prepare('SELECT id, name, position, is_done AS isDone FROM lists WHERE board_id = ? ORDER BY position').all(boardId);
     const cards = db.prepare(`SELECT c.id, c.list_id AS listId, c.title, c.description, c.assignee_id AS assigneeId, u.name AS assigneeName,
-        c.due_date AS dueDate, c.priority, c.phase, c.position, c.completed_at AS completedAt, c.updated_at AS updatedAt
-      FROM cards c LEFT JOIN users u ON u.id = c.assignee_id WHERE c.board_id = ? ORDER BY c.position`).all(boardId);
+        c.due_date AS dueDate, c.priority, c.phase, c.checklists, c.position, c.completed_at AS completedAt, c.updated_at AS updatedAt
+      FROM cards c LEFT JOIN users u ON u.id = c.assignee_id WHERE c.board_id = ? ORDER BY c.position`).all(boardId)
+      .map((c) => ({ ...c, checklists: JSON.parse(c.checklists) }));
     const members = db.prepare(`SELECT u.id, u.name, u.email, u.role FROM board_members m JOIN users u ON u.id = m.user_id
       WHERE m.board_id = ? AND u.active = 1 ORDER BY u.name`).all(boardId);
     const owner = access.board.owner_id ? db.prepare('SELECT name FROM users WHERE id = ?').get(access.board.owner_id) : null;
@@ -180,6 +181,12 @@ const cardFields = {
   dueDate: date,
   priority,
   phase: text(60),
+  // Até 10 checklists por cartão e 30 itens cada; itens sem texto são descartados.
+  checklists: z.array(z.object({
+    title: text(80),
+    items: z.array(z.object({ text: text(200), done: z.boolean() }).strict()).max(30),
+  }).strict()).max(10)
+    .transform((cls) => cls.map((cl) => ({ title: cl.title || 'Checklist', items: cl.items.filter((i) => i.text) }))),
 };
 
 router.post('/:id/cards', (req, res, next) => {
@@ -187,7 +194,7 @@ router.post('/:id/cards', (req, res, next) => {
     const boardId = parse(id, req.params.id);
     assertEdit(boardAccess(req.user, boardId));
     const d = parse(z.object({ listId: id, ...cardFields }).partial({
-      description: true, assigneeId: true, dueDate: true, priority: true, phase: true }), req.body);
+      description: true, assigneeId: true, dueDate: true, priority: true, phase: true, checklists: true }), req.body);
     const list = db.prepare('SELECT * FROM lists WHERE id = ? AND board_id = ?').get(d.listId, boardId);
     if (!list) throw new HttpError(400, 'Coluna inválida para este quadro.');
     if (d.assigneeId && !db.prepare('SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?').get(boardId, d.assigneeId)) {
@@ -195,10 +202,10 @@ router.post('/:id/cards', (req, res, next) => {
     }
     const now = Date.now();
     const pos = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cards WHERE list_id = ?').get(list.id).p;
-    const info = db.prepare(`INSERT INTO cards (board_id, list_id, title, description, assignee_id, due_date, priority, phase, position,
-        completed_at, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    const info = db.prepare(`INSERT INTO cards (board_id, list_id, title, description, assignee_id, due_date, priority, phase, checklists, position,
+        completed_at, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(boardId, list.id, d.title, d.description || '', d.assigneeId ?? null, d.dueDate ?? null, d.priority || 'Média',
-        d.phase || '', pos, list.is_done ? now : null, req.user.id, now, now);
+        d.phase || '', JSON.stringify(d.checklists || []), pos, list.is_done ? now : null, req.user.id, now, now);
     audit(req, 'cartao.criado', { entity: 'card', entityId: info.lastInsertRowid, details: { boardId, title: d.title } });
     res.status(201).json({ id: info.lastInsertRowid });
   } catch (e) { next(e); }

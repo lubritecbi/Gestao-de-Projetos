@@ -100,6 +100,10 @@ const MIGRATIONS = [
   );
   CREATE INDEX idx_audit_at ON audit_log(at);
   `,
+  // 2: checklists do cartão, guardadas como lista JSON (começa vazia nos cartões que já existem).
+  `
+  ALTER TABLE cards ADD COLUMN checklists TEXT NOT NULL DEFAULT '[]';
+  `,
 ];
 
 function migrate() {

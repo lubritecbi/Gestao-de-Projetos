@@ -256,6 +256,11 @@
     const dias = (Date.parse(c.dueDate) - Date.parse(hoje())) / 86400000;
     return dias <= 3 ? 'proximo' : '';
   }
+  // Soma os itens de todas as checklists do cartão: { feitos, total }.
+  function resumoChecklists(c) {
+    const itens = (c.checklists || []).flatMap((cl) => cl.items || []);
+    return { feitos: itens.filter((i) => i.done).length, total: itens.length };
+  }
   const diasAte = (data) => Math.round((Date.parse(data) - Date.parse(hoje())) / 86400000);
 
   let arrastado = null;
@@ -310,6 +315,7 @@
 
   function cartao(c, l, d, perm, painel) {
     const prazo = estadoPrazo(c, l);
+    const chk = resumoChecklists(c);
     const prazoCurto = l.isDone ? 'feito' : !c.dueDate ? '' : prazo === 'atrasado' ? `-${-diasAte(c.dueDate)}d` : fmtData(c.dueDate).slice(0, 5);
     const n = el('button', { class: 'cartao', type: 'button', draggable: perm.canEdit ? 'true' : null,
       'aria-describedby': 'instr-dnd', 'aria-pressed': String(c.id === cartaoSel), dataset: { prazo, id: c.id },
@@ -322,7 +328,10 @@
       el('span', { class: 'linha-topo' }, el('span', { text: `#${c.id}` }),
         el('span', { class: 'prazo', text: prazoCurto, 'aria-label': prazo === 'atrasado' ? `atrasado desde ${fmtData(c.dueDate)}` : null })),
       el('span', { class: 'titulo', text: c.title }),
-      el('span', { class: 'resp', text: c.assigneeName || 'Sem responsável' }));
+      el('span', { class: 'linha-base' },
+        el('span', { class: 'resp', text: c.assigneeName || 'Sem responsável' }),
+        chk.total ? el('span', { class: 'check', dataset: { completo: chk.feitos === chk.total ? '1' : '0' },
+          'aria-label': `checklist: ${chk.feitos} de ${chk.total} itens marcados`, text: `${chk.feitos}/${chk.total}` }) : null));
     if (perm.canEdit) {
       n.addEventListener('dragstart', (e) => { arrastado = c.id; n.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(c.id)); });
       n.addEventListener('dragend', () => { n.classList.remove('arrastando'); arrastado = null; });
@@ -339,6 +348,7 @@
     const idx = d.lists.findIndex((l) => l.id === c.listId);
     const lista = d.lists[idx];
     const est = estadoPrazo(c, lista);
+    const chkEt = resumoChecklists(c);
     const dias = c.dueDate ? diasAte(c.dueDate) : null;
     const prazoLongo = lista.isDone ? (c.dueDate ? `${fmtData(c.dueDate)}, concluído` : 'Concluído')
       : !c.dueDate ? 'Sem prazo'
@@ -361,7 +371,8 @@
         campoEt('Prioridade', c.priority),
         campoEt('Responsável', c.assigneeName || 'Sem responsável'),
         campoEt('Fase', c.phase || 'Sem fase'),
-        campoEt('Prazo', prazoLongo, { largo: true, mono: true })),
+        campoEt('Prazo', prazoLongo, { largo: true, mono: true }),
+        chkEt.total ? campoEt('Checklist', `${chkEt.feitos} de ${chkEt.total} itens marcados`, { largo: true }) : null),
       el('div', { class: 'corpo' },
         c.description ? el('p', { class: 'descricao', text: c.description }) : null,
         el('ol', { class: 'etapas', 'aria-label': 'Etapas do cartão' }, d.lists.map((l, i) =>
@@ -409,11 +420,56 @@
     };
     ['assigneeId', 'priority', 'phase', 'listId'].forEach((k) => { f[k].disabled = !editavel; });
     const erro = el('p', { class: 'erro', role: 'alert' });
+
+    // Checklists: o que se edita aqui é uma cópia; só é gravada ao clicar em "Salvar cartão".
+    const checklists = (c?.checklists || []).map((cl) => ({ title: cl.title, items: cl.items.map((i) => ({ text: i.text, done: i.done })) }));
+    const areaCheck = el('div', { class: 'checklists' });
+    // Redesenha a área e devolve o foco ao campo indicado (para o teclado não "se perder").
+    const desenharChecklists = (foco) => {
+      areaCheck.replaceChildren(...[
+        el('div', { class: 'checklists-topo' }, el('span', { class: 'rotulo', text: 'Checklists' }),
+          editavel && checklists.length < 10 ? el('button', { class: 'btn btn-fantasma', type: 'button', text: '+ Adicionar checklist',
+            onclick: () => { checklists.push({ title: 'Checklist', items: [] }); desenharChecklists(`[data-cl="${checklists.length - 1}"] .checklist-titulo`); } }) : null),
+        checklists.length ? null : el('p', { class: 'ajuda', text: editavel ? 'Nenhuma checklist. Use "+ Adicionar checklist" para dividir o cartão em itens.' : 'Nenhuma checklist.' }),
+        checklists.map((cl, ci) => {
+          const feitos = cl.items.filter((i) => i.done).length;
+          const completo = cl.items.length > 0 && feitos === cl.items.length;
+          const barra = el('span'); barra.style.width = pct(cl.items.length ? feitos / cl.items.length : 0);
+          const novo = el('input', { class: 'novo-item', maxlength: 200, placeholder: 'Novo item', 'aria-label': `Novo item em ${cl.title}` });
+          const incluir = () => {
+            const t = novo.value.trim(); if (!t) return;
+            if (cl.items.length >= 30) { erro.textContent = 'Cada checklist pode ter no máximo 30 itens.'; return; }
+            cl.items.push({ text: t, done: false }); desenharChecklists(`[data-cl="${ci}"] .novo-item`);
+          };
+          novo.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); incluir(); } });
+          return el('section', { class: 'checklist', dataset: { cl: String(ci) }, 'aria-label': `Checklist ${cl.title}` },
+            el('div', { class: 'checklist-cab' },
+              editavel ? el('input', { class: 'checklist-titulo', value: cl.title, maxlength: 80, 'aria-label': 'Nome da checklist',
+                oninput: (e) => { cl.title = e.target.value; } }) : el('strong', { class: 'checklist-titulo', text: cl.title }),
+              el('span', { class: 'check', dataset: { completo: completo ? '1' : '0' }, text: `${feitos}/${cl.items.length}` }),
+              editavel ? el('button', { class: 'btn btn-fantasma btn-perigo', type: 'button', text: 'Excluir', 'aria-label': `Excluir checklist ${cl.title}`,
+                onclick: () => { checklists.splice(ci, 1); desenharChecklists(); } }) : null),
+            el('div', { class: 'progresso', dataset: { completo: completo ? '1' : '0' }, role: 'img', 'aria-label': `${pct(cl.items.length ? feitos / cl.items.length : 0)} marcado` }, barra),
+            el('ul', { class: 'checklist-itens' }, cl.items.map((it, ii) => el('li', { dataset: { feito: it.done ? '1' : '0' } },
+              el('input', { type: 'checkbox', class: 'item-marca', checked: it.done, disabled: !editavel, 'aria-label': it.text,
+                onchange: (e) => { it.done = e.target.checked; desenharChecklists(`[data-cl="${ci}"] li:nth-child(${ii + 1}) .item-marca`); } }),
+              editavel ? el('input', { class: 'item-texto', value: it.text, maxlength: 200, 'aria-label': `Texto do item ${ii + 1}`,
+                oninput: (e) => { it.text = e.target.value; } }) : el('span', { class: 'item-texto', text: it.text }),
+              editavel ? el('button', { class: 'btn btn-fantasma', type: 'button', text: '✕', 'aria-label': `Remover item ${it.text}`,
+                onclick: () => { cl.items.splice(ii, 1); desenharChecklists(`[data-cl="${ci}"] .novo-item`); } }) : null))),
+            editavel && cl.items.length < 30 ? el('div', { class: 'novo-item-linha' }, novo,
+              el('button', { class: 'btn', type: 'button', text: 'Adicionar', onclick: incluir })) : null);
+        })].flat().filter(Boolean));
+      if (foco) areaCheck.querySelector(foco)?.focus();
+    };
+    desenharChecklists();
+
     const corpo = [
       campo('Título', f.title), campo('Descrição', f.description),
       el('div', { class: 'grade-2' }, campo('Coluna', f.listId), campo('Responsável', f.assigneeId),
         campo('Prazo', f.dueDate), campo('Prioridade', f.priority)),
       campo('Fase do projeto', f.phase),
+      areaCheck,
       c ? el('p', { class: 'ajuda', text: `Última alteração em ${fmtHora(c.updatedAt)}` }) : null,
       erro,
     ];
@@ -421,6 +477,11 @@
       erro.textContent = '';
       const dados = { title: f.title.value, description: f.description.value, assigneeId: f.assigneeId.value ? Number(f.assigneeId.value) : null,
         dueDate: f.dueDate.value || null, priority: f.priority.value, phase: f.phase.value };
+      areaCheck.querySelectorAll('.checklist').forEach((sec) => {
+        const t = sec.querySelector('.novo-item')?.value.trim();
+        if (t) checklists[Number(sec.dataset.cl)].items.push({ text: t, done: false });
+      });
+      dados.checklists = checklists;
       try {
         if (c) {
           await api('PATCH', `/cards/${c.id}`, dados);

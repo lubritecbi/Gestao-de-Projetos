@@ -28,7 +28,7 @@ O GitHub Pages só hospeda arquivos estáticos. Por isso, nessa versão:
 | Telas | GitHub Pages | `web/` (mesmas telas de `public/`, com caminhos relativos) |
 | Ponte telas → Supabase | GitHub Pages | `web/api-supabase.js` responde às chamadas `/api/...` das telas usando o Supabase |
 | Login e senhas | Supabase Auth | cadastro público desligado; só o admin cria acessos |
-| Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql` |
+| Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql`, `supabase/05_checklists.sql` (checklists nos cartões) |
 | Primeiro administrador | Supabase | `supabase/02_primeiro_admin.sql` |
 | Backup e manter ativo | GitHub Actions | `.github/workflows/backup-supabase.yml`, `supabase/04_restaurar_gatilho.sql` |
 | Gestão de usuários (admin) | Supabase Edge Function | `supabase/functions/admin-usuarios/index.ts` |
@@ -67,7 +67,7 @@ Para rodar com servidor próprio (Node.js + SQLite), siga as seções de instala
 
 | Área | Recursos |
 |---|---|
-| Quadros | Um quadro por projeto, colunas editáveis (A fazer, Em andamento, Em validação, Concluído), cartões com responsável, prazo, prioridade e fase; etiqueta do cartão ao lado com botões para avançar ou voltar etapa; arrastar e soltar |
+| Quadros | Um quadro por projeto, colunas editáveis (A fazer, Em andamento, Em validação, Concluído), cartões com responsável, prazo, prioridade, fase e checklists (várias por cartão, com contador de itens marcados no quadro); etiqueta do cartão ao lado com botões para avançar ou voltar etapa; arrastar e soltar |
 | Desempenho | % concluído e farol por projeto (mesma regra da planilha), atividades atrasadas, entregas por semana, carga e pontualidade por pessoa |
 | Usuários | Somente o administrador cria acessos; senha temporária com troca obrigatória; redefinir senha, desbloquear, desativar, mudar perfil |
 | Auditoria | Registro de logins, falhas, bloqueios, alterações de usuários, projetos e cartões, com IP e horário |
