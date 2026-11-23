@@ -31,7 +31,7 @@ O GitHub Pages só hospeda arquivos estáticos. Por isso, nessa versão:
 | Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql`, `supabase/05_checklists.sql` (checklists nos cartões) |
 | Primeiro administrador | Supabase | `supabase/02_primeiro_admin.sql` |
 | Backup e manter ativo | GitHub Actions | `.github/workflows/backup-supabase.yml`, `supabase/04_restaurar_gatilho.sql` |
-| Gestão de usuários (admin) | Supabase Edge Function | `supabase/functions/admin-usuarios/index.ts` |
+| Gestão de usuários (admin) | Supabase Edge Function | `supabase/functions/admin-usuarios/index.ts` (no Supabase: nome `admin-usuarios`, endereço `/functions/v1/hyper-endpoint`, **Verify JWT desligado**) |
 
 **Quem decide as permissões é o banco**, não a página: as regras RLS conferem perfil, participação no quadro, usuário ativo e troca da senha temporária em cada consulta. A chave em `web/config.js` é a pública (anon/publishable) e pode ficar no GitHub; a chave secreta (service_role) existe só dentro da Edge Function. O fluxo de publicação bloqueia o envio se encontrar uma chave secreta.
 

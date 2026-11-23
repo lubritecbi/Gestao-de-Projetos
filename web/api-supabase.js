@@ -113,9 +113,12 @@
   }
   const resumoQuadro = (b) => ({ ...b, ...farol(b) });
 
-  // Chamada à função de servidor do admin (Edge Function)
+  // Chamada à função de servidor do admin (Edge Function).
+  // Por quê "hyper-endpoint": no Supabase a função aparece com o nome "admin-usuarios", mas o
+  // endereço dela (Edge Functions > admin-usuarios > Overview > Endpoint URL) é /functions/v1/hyper-endpoint.
+  const ENDERECO_ADMIN_USUARIOS = 'hyper-endpoint';
   async function adminUsuarios(corpo) {
-    const { data, error } = await sb.functions.invoke('admin-usuarios', { body: corpo });
+    const { data, error } = await sb.functions.invoke(ENDERECO_ADMIN_USUARIOS, { body: corpo });
     if (error) {
       const r = error.context;
       // Sem resposta (rede caiu ou o navegador bloqueou a chamada)

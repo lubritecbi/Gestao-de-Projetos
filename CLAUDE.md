@@ -20,7 +20,9 @@ painel de desempenho e auditoria.
 - Supabase plano gratuito: projeto "gestao-projetos" (ID pzoflktbghricjjriirt, região us-east-2).
   - Login no Supabase Auth (cadastro público desligado).
   - PostgreSQL com permissões por perfil em RLS e auditoria por gatilhos.
-  - Edge Function "admin-usuarios" para gestão de usuários.
+  - Edge Function "admin-usuarios" para gestão de usuários. No Supabase, o endereço dela é
+    /functions/v1/hyper-endpoint (é o que web/api-supabase.js chama) e "Verify JWT" fica DESLIGADO:
+    ligado, o Supabase recusa a consulta prévia do navegador. A própria função confere se quem chama é admin.
   - Scripts do banco em supabase/: 01_banco, 02_primeiro_admin, 03_ajustes_telas, 04_restaurar_gatilho,
     05_checklists (coluna "checklists" nos cartões: várias checklists com nome e itens).
 - Na página só vai a chave pública (publishable). A chave secreta NUNCA vai para o GitHub.
