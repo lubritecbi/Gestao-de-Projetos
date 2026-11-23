@@ -18,6 +18,7 @@ Não abra issue pública para falhas de segurança. Envie os detalhes diretament
 - **Cadastro fechado:** em Supabase > Authentication, "Allow new users to sign up" deve ficar **desligado**. Só o administrador cria acessos, pela Edge Function `admin-usuarios`.
 - **Senhas:** mínimo de 12 caracteres com minúsculas, maiúsculas, números e símbolos (configurado no Supabase e conferido pela página). Senhas não podem ser lidas, só redefinidas.
 - **Backups:** gerados pelo GitHub Actions e **sempre criptografados** (AES-256), porque arquivos de um repositório público podem ser baixados por qualquer conta do GitHub. Guarde a `BACKUP_PASSPHRASE` fora do GitHub; troque-a se alguém que a conhecia sair da equipe.
+- **Anexos dos cartões:** ficam no depósito **privado** `anexos` do Supabase Storage (nunca público). Só membros do projeto abrem ou baixam, por links que expiram em 1 hora; Leitor não envia nem exclui. Aceita só imagens (PNG, JPG, WEBP, GIF) e PDF de até 5 MB, conferidos pelo conteúdo do arquivo e pelo próprio depósito. Regras em `supabase/06_anexos.sql`.
 - **Desligamento de pessoas:** desative o usuário na tela Usuários no mesmo dia. O acesso aos dados é cortado na hora e o login fica bloqueado.
 
 ## Controles implementados no sistema

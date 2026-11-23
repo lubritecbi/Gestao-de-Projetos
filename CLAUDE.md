@@ -24,7 +24,9 @@ painel de desempenho e auditoria.
     /functions/v1/hyper-endpoint (é o que web/api-supabase.js chama) e "Verify JWT" fica DESLIGADO:
     ligado, o Supabase recusa a consulta prévia do navegador. A própria função confere se quem chama é admin.
   - Scripts do banco em supabase/: 01_banco, 02_primeiro_admin, 03_ajustes_telas, 04_restaurar_gatilho,
-    05_checklists (coluna "checklists" nos cartões: várias checklists com nome e itens).
+    05_checklists (coluna "checklists" nos cartões: várias checklists com nome e itens),
+    06_anexos (anexos nos cartões: depósito privado "anexos" no Storage, tabela card_attachments;
+    imagens e PDF até 5 MB; o backup automático NÃO copia os arquivos do Storage).
 - Na página só vai a chave pública (publishable). A chave secreta NUNCA vai para o GitHub.
 - Versão alternativa com servidor próprio (Node.js 22 + Express + SQLite) em src/ e public/,
   para uma futura hospedagem pela TI.

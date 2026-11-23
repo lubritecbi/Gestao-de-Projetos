@@ -28,7 +28,8 @@ O GitHub Pages só hospeda arquivos estáticos. Por isso, nessa versão:
 | Telas | GitHub Pages | `web/` (mesmas telas de `public/`, com caminhos relativos) |
 | Ponte telas → Supabase | GitHub Pages | `web/api-supabase.js` responde às chamadas `/api/...` das telas usando o Supabase |
 | Login e senhas | Supabase Auth | cadastro público desligado; só o admin cria acessos |
-| Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql`, `supabase/05_checklists.sql` (checklists nos cartões) |
+| Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql`, `supabase/05_checklists.sql` (checklists nos cartões), `supabase/06_anexos.sql` (anexos nos cartões) |
+| Anexos dos cartões (imagens e PDF) | Supabase Storage (depósito privado `anexos`) | `supabase/06_anexos.sql`; até 5 MB por arquivo; só membros do projeto abrem ou baixam |
 | Primeiro administrador | Supabase | `supabase/02_primeiro_admin.sql` |
 | Backup e manter ativo | GitHub Actions | `.github/workflows/backup-supabase.yml`, `supabase/04_restaurar_gatilho.sql` |
 | Gestão de usuários (admin) | Supabase Edge Function | `supabase/functions/admin-usuarios/index.ts` (no Supabase: nome `admin-usuarios`, endereço `/functions/v1/hyper-endpoint`, **Verify JWT desligado**) |
@@ -44,6 +45,8 @@ A senha de um usuário não pode ser lida, só substituída: pelo botão **Redef
 ### Backup e restauração (Supabase)
 
 O fluxo `.github/workflows/backup-supabase.yml` roda segunda, quarta e sexta de madrugada. Ele conecta no banco (o que mantém o projeto gratuito ativo) e gera um backup **criptografado com AES-256**, guardado por 30 dias na aba **Actions** (execução > **Artifacts**). Como o repositório é público, sem a senha o arquivo é inútil.
+
+**Atenção:** esse backup copia o banco (inclusive a lista de anexos), mas **não** os arquivos anexados, que ficam no Storage do Supabase. Para guardar uma cópia dos arquivos, baixe-os em Supabase > Storage > `anexos`.
 
 Configuração única, em **Settings > Secrets and variables > Actions > New repository secret**:
 
@@ -67,7 +70,7 @@ Para rodar com servidor próprio (Node.js + SQLite), siga as seções de instala
 
 | Área | Recursos |
 |---|---|
-| Quadros | Um quadro por projeto, colunas editáveis (A fazer, Em andamento, Em validação, Concluído), cartões com responsável, prazo, prioridade, fase e checklists (várias por cartão, com contador de itens marcados no quadro); etiqueta do cartão ao lado com botões para avançar ou voltar etapa; arrastar e soltar |
+| Quadros | Um quadro por projeto, colunas editáveis (A fazer, Em andamento, Em validação, Concluído), cartões com responsável, prazo, prioridade, fase, checklists (várias por cartão, com contador de itens marcados no quadro) e anexos (imagens e PDF até 5 MB: botão, Ctrl+V para colar print ou arrastar o arquivo); etiqueta do cartão ao lado com botões para avançar ou voltar etapa; arrastar e soltar |
 | Desempenho | % concluído e farol por projeto (mesma regra da planilha), atividades atrasadas, entregas por semana, carga e pontualidade por pessoa |
 | Usuários | Somente o administrador cria acessos; senha temporária com troca obrigatória; redefinir senha, desbloquear, desativar, mudar perfil |
 | Auditoria | Registro de logins, falhas, bloqueios, alterações de usuários, projetos e cartões, com IP e horário |

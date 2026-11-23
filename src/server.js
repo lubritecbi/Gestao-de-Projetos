@@ -43,7 +43,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '100kb', strict: true }));
+// JSON até 100 KB; só o envio de anexo aceita até 7 MB (arquivo de 5 MB em base64).
+const jsonPadrao = express.json({ limit: '100kb', strict: true });
+const jsonAnexo = express.json({ limit: '7mb', strict: true });
+app.use((req, res, next) => (req.method === 'POST' && /^\/api\/cards\/\d+\/attachments$/.test(req.path) ? jsonAnexo : jsonPadrao)(req, res, next));
 app.use(cookieParser());
 app.use(loadSession);
 

@@ -104,6 +104,22 @@ const MIGRATIONS = [
   `
   ALTER TABLE cards ADD COLUMN checklists TEXT NOT NULL DEFAULT '[]';
   `,
+  // 3: anexos dos cartões (imagens e PDF). O arquivo fica no próprio banco: entra no backup
+  // e é apagado junto com o cartão.
+  `
+  CREATE TABLE attachments (
+    id INTEGER PRIMARY KEY,
+    card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    data BLOB NOT NULL,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_attachments_card ON attachments(card_id);
+  `,
 ];
 
 function migrate() {

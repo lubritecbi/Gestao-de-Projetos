@@ -38,7 +38,9 @@
 
   async function api(method, url, body) {
     const opts = { method, credentials: 'same-origin', headers: {} };
-    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    // Pedidos que alteram dados vão sempre como JSON (mesmo sem conteúdo, como nas exclusões):
+    // a proteção CSRF do servidor próprio recusa o que não for JSON.
+    if (body !== undefined || method !== 'GET') { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body ?? {}); }
     if (method !== 'GET') opts.headers['X-CSRF-Token'] = state.csrf;
     const r = await fetch('/api' + url, opts);
     if (r.status === 401) { location.replace('/login'); throw new Error('Sessão expirada.'); }
@@ -330,8 +332,10 @@
       el('span', { class: 'titulo', text: c.title }),
       el('span', { class: 'linha-base' },
         el('span', { class: 'resp', text: c.assigneeName || 'Sem responsável' }),
-        chk.total ? el('span', { class: 'check', dataset: { completo: chk.feitos === chk.total ? '1' : '0' },
-          'aria-label': `checklist: ${chk.feitos} de ${chk.total} itens marcados`, text: `${chk.feitos}/${chk.total}` }) : null));
+        el('span', { class: 'marcas' },
+          c.attachmentCount ? el('span', { class: 'anexo-qtd', 'aria-label': `${c.attachmentCount} ${c.attachmentCount === 1 ? 'anexo' : 'anexos'}`, text: String(c.attachmentCount) }) : null,
+          chk.total ? el('span', { class: 'check', dataset: { completo: chk.feitos === chk.total ? '1' : '0' },
+            'aria-label': `checklist: ${chk.feitos} de ${chk.total} itens marcados`, text: `${chk.feitos}/${chk.total}` }) : null)));
     if (perm.canEdit) {
       n.addEventListener('dragstart', (e) => { arrastado = c.id; n.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(c.id)); });
       n.addEventListener('dragend', () => { n.classList.remove('arrastando'); arrastado = null; });
@@ -372,7 +376,8 @@
         campoEt('Responsável', c.assigneeName || 'Sem responsável'),
         campoEt('Fase', c.phase || 'Sem fase'),
         campoEt('Prazo', prazoLongo, { largo: true, mono: true }),
-        chkEt.total ? campoEt('Checklist', `${chkEt.feitos} de ${chkEt.total} itens marcados`, { largo: true }) : null),
+        chkEt.total ? campoEt('Checklist', `${chkEt.feitos} de ${chkEt.total} itens marcados`, { largo: true }) : null,
+        c.attachmentCount ? campoEt('Anexos', `${c.attachmentCount} ${c.attachmentCount === 1 ? 'arquivo' : 'arquivos'}`, { largo: true }) : null),
       el('div', { class: 'corpo' },
         c.description ? el('p', { class: 'descricao', text: c.description }) : null,
         el('ol', { class: 'etapas', 'aria-label': 'Etapas do cartão' }, d.lists.map((l, i) =>
@@ -464,12 +469,108 @@
     };
     desenharChecklists();
 
+    // Anexos (imagens e PDF): enviados na hora, sem esperar "Salvar cartão", porque o arquivo vai direto para o depósito.
+    const TIPOS_ANEXO = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'];
+    const areaAnexos = el('div', { class: 'anexos' });
+    const entradaArquivo = el('input', { type: 'file', accept: TIPOS_ANEXO.join(','), multiple: true, hidden: true,
+      onchange: (e) => { enviarArquivos([...e.target.files]); e.target.value = ''; } });
+    let anexos = null; let enviando = 0; let alterouAnexos = false;
+    const fmtTamanho = (n) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1).replace('.', ',')} MB`);
+    const paraBase64 = (arq) => new Promise((ok, falha) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result).split(',')[1] || '');
+      r.onerror = () => falha(new Error('Não foi possível ler o arquivo.'));
+      r.readAsDataURL(arq);
+    });
+    // Na demonstração os arquivos vêm como "data:"; o navegador não abre esse formato numa aba nova, então vira um link local (blob).
+    const linkLocal = async (url) => (url && url.startsWith('data:') ? URL.createObjectURL(await (await fetch(url)).blob()) : url);
+    const carregarAnexos = async () => {
+      try {
+        const lista = await api('GET', `/cards/${c.id}/attachments`);
+        anexos = await Promise.all(lista.map(async (a) => ({ ...a, url: await linkLocal(a.url), downloadUrl: await linkLocal(a.downloadUrl) })));
+      } catch (e) { anexos = []; erro.textContent = e.message; }
+      desenharAnexos();
+    };
+    const enviarArquivos = async (arquivos) => {
+      if (!c || !editavel || !arquivos.length) return;
+      erro.textContent = '';
+      for (const arq of arquivos) {
+        if (!TIPOS_ANEXO.includes(arq.type)) { erro.textContent = `"${arq.name}": envie imagem (PNG, JPG, WEBP, GIF) ou PDF.`; continue; }
+        if (arq.size > 5 * 1024 * 1024) { erro.textContent = `"${arq.name}" passa de 5 MB.`; continue; }
+        // Print colado com Ctrl+V chega sem nome útil ("image.png"): ganha um nome com data e hora.
+        const nome = /^image\.(png|jpe?g|gif|webp)$/i.test(arq.name || '') || !arq.name
+          ? `print-${new Date().toLocaleString('sv-SE').replace(/[: ]/g, '-')}.${arq.type.split('/')[1].replace('jpeg', 'jpg')}` : arq.name;
+        enviando++; desenharAnexos();
+        try {
+          await api('POST', `/cards/${c.id}/attachments`, { name: nome, data: await paraBase64(arq) });
+          alterouAnexos = true;
+        } catch (e) { erro.textContent = e.message; } finally { enviando--; }
+      }
+      await carregarAnexos();
+    };
+    const excluirAnexo = async (a) => {
+      if (!await confirmar(`Excluir o anexo "${a.name}"? Essa ação não pode ser desfeita.`)) return;
+      try { await api('DELETE', `/attachments/${a.id}`); alterouAnexos = true; await carregarAnexos(); } catch (e) { erro.textContent = e.message; }
+    };
+    const desenharAnexos = () => {
+      areaAnexos.replaceChildren(...[
+        el('div', { class: 'checklists-topo' }, el('span', { class: 'rotulo', text: 'Anexos' }),
+          c && editavel ? el('button', { class: 'btn btn-fantasma', type: 'button', text: '+ Anexar arquivo', onclick: () => entradaArquivo.click() }) : null),
+        !c ? el('p', { class: 'ajuda', text: 'Crie o cartão para poder anexar arquivos.' }) : null,
+        c && editavel ? el('p', { class: 'ajuda', text: 'Imagens (PNG, JPG, WEBP, GIF) ou PDF, até 5 MB. Também dá para colar um print com Ctrl+V ou arrastar o arquivo para esta janela.' }) : null,
+        enviando ? el('p', { class: 'ajuda', role: 'status', text: 'Enviando arquivo…' }) : null,
+        c && anexos === null ? el('p', { class: 'ajuda', text: 'Carregando anexos…' }) : null,
+        c && anexos && !anexos.length && !enviando ? el('p', { class: 'ajuda', text: 'Nenhum anexo.' }) : null,
+        c && anexos && anexos.length ? el('ul', { class: 'anexos-lista' }, anexos.map((a) => {
+          const imagem = a.type.startsWith('image/');
+          return el('li', {},
+            el('a', { class: 'anexo-miniatura', href: a.url, target: '_blank', rel: 'noopener', 'aria-label': `Abrir ${a.name}` },
+              imagem ? el('img', { src: a.url, alt: '', loading: 'lazy' }) : el('span', { text: 'PDF' })),
+            el('div', { class: 'anexo-info' },
+              el('span', { class: 'anexo-nome', text: a.name, title: a.name }),
+              el('span', { class: 'ajuda', text: [fmtTamanho(a.size), a.authorName, fmtHora(a.createdAt)].filter(Boolean).join(' · ') }),
+              el('span', { class: 'anexo-acoes' },
+                el('a', { class: 'btn btn-fantasma', href: a.url, target: '_blank', rel: 'noopener', text: 'Abrir' }),
+                el('a', { class: 'btn btn-fantasma', href: a.downloadUrl, download: a.name, text: 'Baixar' }),
+                editavel ? el('button', { class: 'btn btn-fantasma btn-perigo', type: 'button', text: 'Excluir', 'aria-label': `Excluir anexo ${a.name}`,
+                  onclick: () => excluirAnexo(a) }) : null)));
+        })) : null,
+        entradaArquivo,
+      ].filter(Boolean));
+    };
+    desenharAnexos();
+    if (c) {
+      carregarAnexos();
+      // Colar print (Ctrl+V) e arrastar arquivo valem enquanto a janela do cartão estiver aberta.
+      const aoColar = (e) => {
+        const arquivos = [...(e.clipboardData?.files || [])].filter((f) => TIPOS_ANEXO.includes(f.type));
+        if (!arquivos.length || !editavel) return;
+        e.preventDefault(); enviarArquivos(arquivos);
+      };
+      const aoArrastar = (e) => { if (editavel && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); areaAnexos.classList.add('alvo'); } };
+      const aoSoltar = (e) => {
+        areaAnexos.classList.remove('alvo');
+        if (!editavel || !e.dataTransfer?.files?.length) return;
+        e.preventDefault(); enviarArquivos([...e.dataTransfer.files]);
+      };
+      document.addEventListener('paste', aoColar);
+      dlg.addEventListener('dragover', aoArrastar);
+      dlg.addEventListener('drop', aoSoltar);
+      dlg.addEventListener('close', () => {
+        document.removeEventListener('paste', aoColar);
+        dlg.removeEventListener('dragover', aoArrastar);
+        dlg.removeEventListener('drop', aoSoltar);
+        if (alterouAnexos) rotear(); // atualiza o contador de anexos no quadro
+      }, { once: true });
+    }
+
     const corpo = [
       campo('Título', f.title), campo('Descrição', f.description),
       el('div', { class: 'grade-2' }, campo('Coluna', f.listId), campo('Responsável', f.assigneeId),
         campo('Prazo', f.dueDate), campo('Prioridade', f.priority)),
       campo('Fase do projeto', f.phase),
       areaCheck,
+      areaAnexos,
       c ? el('p', { class: 'ajuda', text: `Última alteração em ${fmtHora(c.updatedAt)}` }) : null,
       erro,
     ];

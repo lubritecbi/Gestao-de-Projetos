@@ -93,7 +93,8 @@ router.get('/:id', (req, res, next) => {
     const access = boardAccess(req.user, boardId);
     const lists = db.prepare('SELECT id, name, position, is_done AS isDone FROM lists WHERE board_id = ? ORDER BY position').all(boardId);
     const cards = db.prepare(`SELECT c.id, c.list_id AS listId, c.title, c.description, c.assignee_id AS assigneeId, u.name AS assigneeName,
-        c.due_date AS dueDate, c.priority, c.phase, c.checklists, c.position, c.completed_at AS completedAt, c.updated_at AS updatedAt
+        c.due_date AS dueDate, c.priority, c.phase, c.checklists, c.position, c.completed_at AS completedAt, c.updated_at AS updatedAt,
+        (SELECT COUNT(*) FROM attachments a WHERE a.card_id = c.id) AS attachmentCount
       FROM cards c LEFT JOIN users u ON u.id = c.assignee_id WHERE c.board_id = ? ORDER BY c.position`).all(boardId)
       .map((c) => ({ ...c, checklists: JSON.parse(c.checklists) }));
     const members = db.prepare(`SELECT u.id, u.name, u.email, u.role FROM board_members m JOIN users u ON u.id = m.user_id

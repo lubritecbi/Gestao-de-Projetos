@@ -166,6 +166,35 @@
         items: itens.map((i) => ({ text: String(i?.text ?? '').trim().slice(0, 200), done: i?.done === true })).filter((i) => i.text) };
     });
   }
+
+  // ---------- anexos (Storage do Supabase, depósito privado "anexos") ----------
+  const DEPOSITO = 'anexos';
+  const MAX_ANEXO = 5 * 1024 * 1024; // 5 MB
+  const EXT_ANEXO = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'application/pdf': 'pdf' };
+  // Descobre o tipo pelo conteúdo do arquivo (não pela extensão, que pode ser trocada).
+  function tipoReal(b) {
+    const ini = (...x) => x.every((v, i) => b[i] === v);
+    if (ini(0x89, 0x50, 0x4E, 0x47)) return 'image/png';
+    if (ini(0xFF, 0xD8, 0xFF)) return 'image/jpeg';
+    if (ini(0x47, 0x49, 0x46, 0x38)) return 'image/gif';
+    if (ini(0x52, 0x49, 0x46, 0x46) && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+    if (ini(0x25, 0x50, 0x44, 0x46, 0x2D)) return 'application/pdf';
+    return null;
+  }
+  function bytesDeBase64(b64) {
+    let bin;
+    try { bin = atob(String(b64 || '')); } catch { throw new Erro(400, 'Arquivo inválido.'); }
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+  const nomeArquivo = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f/\\]/g, '').trim().slice(0, 150) || 'arquivo';
+  // Apaga arquivos do depósito; uma falha aqui não desfaz a exclusão já feita no banco.
+  async function apagarArquivos(caminhos) {
+    if (!caminhos.length) return;
+    const { error } = await sb.storage.from(DEPOSITO).remove(caminhos);
+    if (error) console.warn('[gp] arquivos não removidos do depósito:', error.message);
+  }
   const uuid = (v) => { exigir(typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v), 400, 'Dados inválidos.'); return v; };
 
   // ---------- rotas (mesmas da API original) ----------
@@ -263,12 +292,16 @@
       const boardId = num(p[1]);
 
       if (!p[2] && method === 'GET') {
-        const [qb, ql, qc, qm] = await Promise.all([
+        const [qb, ql, qc, qm, qa] = await Promise.all([
           sb.from('v_quadros').select('*').eq('id', boardId).maybeSingle(),
           sb.from('lists').select('id, name, position, is_done').eq('board_id', boardId).order('position'),
           sb.from('cards').select('*, assignee:profiles!cards_assignee_id_fkey(name)').eq('board_id', boardId).order('position'),
           sb.from('board_members').select('user:profiles(id, name, email, role, active)').eq('board_id', boardId),
+          sb.from('card_attachments').select('card_id').eq('board_id', boardId),
         ]);
+        // Total de anexos por cartão. Se a tabela ainda não existir (06_anexos.sql não rodado), fica 0.
+        const anexosPorCartao = {};
+        for (const a of qa.error ? [] : qa.data) anexosPorCartao[a.card_id] = (anexosPorCartao[a.card_id] || 0) + 1;
         const b = ok(qb); exigir(b, 404, 'Quadro não encontrado.');
         const membros = ok(qm).map((m) => m.user).filter((u) => u && u.active)
           .map(({ active, ...u }) => u).sort((a, c) => a.name.localeCompare(c.name));
@@ -283,7 +316,7 @@
           lists: ok(ql).map((l) => ({ id: l.id, name: l.name, position: l.position, isDone: l.is_done })),
           cards: ok(qc).map((c) => ({ id: c.id, listId: c.list_id, title: c.title, description: c.description,
             assigneeId: c.assignee_id, assigneeName: c.assignee?.name ?? null, dueDate: c.due_date, priority: c.priority,
-            phase: c.phase, checklists: Array.isArray(c.checklists) ? c.checklists : [],
+            phase: c.phase, checklists: Array.isArray(c.checklists) ? c.checklists : [], attachmentCount: anexosPorCartao[c.id] || 0,
             position: c.position, completedAt: ms(c.completed_at), updatedAt: ms(c.updated_at) })),
           members: membros,
         };
@@ -333,6 +366,36 @@
     // ----- cartões -----
     if (p[0] === 'cards') {
       const id = num(p[1]);
+      if (p[2] === 'attachments' && method === 'GET') {
+        const rows = ok(await sb.from('card_attachments')
+          .select('id, name, mime, size, path, created_at, author:profiles!card_attachments_created_by_fkey(name)')
+          .eq('card_id', id).order('created_at'));
+        // Links temporários (1 hora): o depósito é privado, então cada link expira.
+        return Promise.all(rows.map(async (a) => {
+          const dep = sb.storage.from(DEPOSITO);
+          const [ver, baixar] = await Promise.all([dep.createSignedUrl(a.path, 3600), dep.createSignedUrl(a.path, 3600, { download: a.name })]);
+          return { id: a.id, name: a.name, type: a.mime, size: a.size, createdAt: ms(a.created_at), authorName: a.author?.name ?? null,
+            url: ver.data?.signedUrl ?? null, downloadUrl: baixar.data?.signedUrl ?? null };
+        }));
+      }
+      if (p[2] === 'attachments' && method === 'POST') {
+        const bytes = bytesDeBase64(body.data);
+        exigir(bytes.length > 0, 400, 'Arquivo vazio.');
+        exigir(bytes.length <= MAX_ANEXO, 413, 'O arquivo passa de 5 MB.');
+        const tipo = tipoReal(bytes);
+        exigir(tipo, 400, 'Tipo de arquivo não aceito. Envie imagem (PNG, JPG, WEBP, GIF) ou PDF.');
+        const cartao = ok(await sb.from('cards').select('board_id').eq('id', id).maybeSingle());
+        exigir(cartao, 404, 'Cartão não encontrado.');
+        const caminho = `${cartao.board_id}/${id}/${crypto.randomUUID()}.${EXT_ANEXO[tipo]}`;
+        const envio = await sb.storage.from(DEPOSITO).upload(caminho, new Blob([bytes], { type: tipo }), { contentType: tipo, upsert: false });
+        if (envio.error) {
+          if (/row-level security|unauthorized|403/i.test(envio.error.message)) throw new Erro(403, SO_VER);
+          throw new Erro(400, 'Não foi possível enviar o arquivo.');
+        }
+        const r = await sb.from('card_attachments').insert({ card_id: id, board_id: cartao.board_id, name: nomeArquivo(body.name), mime: tipo, size: bytes.length, path: caminho }).select('id').single();
+        if (r.error) { await apagarArquivos([caminho]); throw traduzir(r.error, SO_VER); }
+        return { id: r.data.id };
+      }
       if (p[2] === 'move') {
         ok(await sb.rpc('mover_cartao', { p_card: id, p_list: num(body.listId), p_index: Number(body.index) || 0 }), SO_VER);
         return { ok: true };
@@ -345,7 +408,24 @@
         if (Object.keys(v).length) await atualizar('cards', v, id, SO_VER);
         return { ok: true };
       }
-      if (method === 'DELETE') { await excluir('cards', id, SO_VER); return { ok: true }; }
+      if (method === 'DELETE') {
+        // Guarda os arquivos do cartão antes de excluir, para apagá-los do depósito depois.
+        const qa = await sb.from('card_attachments').select('path').eq('card_id', id);
+        await excluir('cards', id, SO_VER);
+        await apagarArquivos(qa.error ? [] : qa.data.map((a) => a.path));
+        return { ok: true };
+      }
+    }
+
+    // ----- anexos -----
+    if (p[0] === 'attachments' && p[1] && method === 'DELETE') {
+      exigir(/^[0-9a-f-]{36}$/i.test(p[1]), 400, 'Dados inválidos.');
+      const a = ok(await sb.from('card_attachments').select('path').eq('id', p[1]).maybeSingle());
+      exigir(a, 404, 'Anexo não encontrado.');
+      const r = await sb.from('card_attachments').delete({ count: 'exact' }).eq('id', p[1]);
+      ok(r, SO_VER); exigir(r.count > 0, 403, SO_VER);
+      await apagarArquivos([a.path]);
+      return { ok: true };
     }
 
     // ----- painel de desempenho e auditoria -----

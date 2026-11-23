@@ -6,6 +6,7 @@ const { audit } = require('../audit');
 const { boardAccess, assertEdit, HttpError } = require('../access');
 const { z, text, id, parse } = require('../validate');
 const { cardFields } = require('./boards');
+const { MAX_ANEXO, tipoReal, nomeArquivo, disposicao } = require('../files');
 
 const router = express.Router();
 
@@ -107,6 +108,64 @@ router.patch('/cards/:id/move', (req, res, next) => {
     if (from.id !== target.id) {
       audit(req, 'cartao.movido', { entity: 'card', entityId: card.id, details: { de: from.name, para: target.name } });
     }
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ---------- Anexos ----------
+// Ver/baixar: qualquer pessoa com acesso ao quadro. Enviar/excluir: quem edita o quadro.
+function cardForView(req) {
+  const cardId = parse(id, req.params.id);
+  const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId);
+  if (!card) throw new HttpError(404, 'Cartão não encontrado.');
+  boardAccess(req.user, card.board_id);
+  return card;
+}
+
+router.get('/cards/:id/attachments', (req, res, next) => {
+  try {
+    const card = cardForView(req);
+    const rows = db.prepare(`SELECT a.id, a.name, a.mime AS type, a.size, a.created_at AS createdAt, u.name AS authorName
+      FROM attachments a LEFT JOIN users u ON u.id = a.created_by WHERE a.card_id = ? ORDER BY a.created_at, a.id`).all(card.id);
+    res.json(rows.map((a) => ({ ...a, url: `/api/attachments/${a.id}`, downloadUrl: `/api/attachments/${a.id}?download=1` })));
+  } catch (e) { next(e); }
+});
+
+router.post('/cards/:id/attachments', (req, res, next) => {
+  try {
+    const card = loadCard(req);
+    const d = parse(z.object({ name: z.string().max(600), data: z.string().max(7 * 1024 * 1024) }).strict(), req.body);
+    const bytes = Buffer.from(d.data, 'base64');
+    if (!bytes.length) throw new HttpError(400, 'Arquivo vazio.');
+    if (bytes.length > MAX_ANEXO) throw new HttpError(413, 'O arquivo passa de 5 MB.');
+    const tipo = tipoReal(bytes);
+    if (!tipo) throw new HttpError(400, 'Tipo de arquivo não aceito. Envie imagem (PNG, JPG, WEBP, GIF) ou PDF.');
+    const name = nomeArquivo(d.name);
+    const info = db.prepare(`INSERT INTO attachments (card_id, board_id, name, mime, size, data, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(card.id, card.board_id, name, tipo, bytes.length, bytes, req.user.id, Date.now());
+    audit(req, 'cartao.anexo_incluido', { entity: 'card', entityId: card.id, details: { boardId: card.board_id, arquivo: name } });
+    res.status(201).json({ id: info.lastInsertRowid });
+  } catch (e) { next(e); }
+});
+
+router.get('/attachments/:id', (req, res, next) => {
+  try {
+    const a = db.prepare('SELECT * FROM attachments WHERE id = ?').get(parse(id, req.params.id));
+    if (!a) throw new HttpError(404, 'Anexo não encontrado.');
+    boardAccess(req.user, a.board_id);
+    res.set('Content-Type', a.mime);
+    res.set('Content-Disposition', disposicao(req.query.download ? 'attachment' : 'inline', a.name));
+    res.send(a.data);
+  } catch (e) { next(e); }
+});
+
+router.delete('/attachments/:id', (req, res, next) => {
+  try {
+    const a = db.prepare('SELECT id, card_id, board_id, name FROM attachments WHERE id = ?').get(parse(id, req.params.id));
+    if (!a) throw new HttpError(404, 'Anexo não encontrado.');
+    assertEdit(boardAccess(req.user, a.board_id));
+    db.prepare('DELETE FROM attachments WHERE id = ?').run(a.id);
+    audit(req, 'cartao.anexo_excluido', { entity: 'card', entityId: a.card_id, details: { boardId: a.board_id, arquivo: a.name } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

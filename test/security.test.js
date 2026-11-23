@@ -149,6 +149,46 @@ test('checklists: membro grava e marca, leitor não altera, formato inválido é
   assert.deepEqual(v2.data.cards.find((x) => x.id === novo.data.id).checklists, [{ title: 'Checklist', items: [] }], 'nome vazio vira "Checklist"');
 });
 
+test('anexos: membro envia, leitor só vê, tipo real conferido, limite de 5 MB', async () => {
+  // PNG mínimo válido (1x1)
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==', 'base64');
+  const env = await membro.req('POST', `/api/cards/${cardId}/attachments`, { name: 'print da tela.png', data: png.toString('base64') });
+  assert.equal(env.status, 201); const anexoId = env.data.id;
+
+  const lista = await leitor.req('GET', `/api/cards/${cardId}/attachments`);
+  assert.equal(lista.status, 200, 'leitor vê a lista');
+  assert.equal(lista.data.length, 1);
+  assert.equal(lista.data[0].name, 'print da tela.png');
+  assert.equal(lista.data[0].type, 'image/png');
+
+  const baixar = await fetch(`${base}/api/attachments/${anexoId}?download=1`, { headers: { Cookie: leitor.cookie } });
+  assert.equal(baixar.status, 200, 'leitor baixa');
+  assert.equal(baixar.headers.get('content-type'), 'image/png');
+  assert.match(baixar.headers.get('content-disposition'), /^attachment;/);
+  assert.equal(baixar.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(Buffer.from(await baixar.arrayBuffer()), png, 'devolve exatamente o arquivo enviado');
+
+  assert.equal((await leitor.req('POST', `/api/cards/${cardId}/attachments`, { name: 'x.png', data: png.toString('base64') })).status, 403, 'leitor não envia');
+  assert.equal((await leitor.req('DELETE', `/api/attachments/${anexoId}`, {})).status, 403, 'leitor não exclui');
+
+  const html = Buffer.from('<html><script>alert(1)</script></html>').toString('base64');
+  assert.equal((await membro.req('POST', `/api/cards/${cardId}/attachments`, { name: 'falso.png', data: html })).status, 400, 'HTML disfarçado de imagem é recusado');
+  const grande = Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024)]).toString('base64');
+  assert.equal((await membro.req('POST', `/api/cards/${cardId}/attachments`, { name: 'grande.png', data: grande })).status, 413, 'acima de 5 MB é recusado');
+
+  const quadro = await membro.req('GET', `/api/boards/${boardId}`);
+  assert.equal(quadro.data.cards.find((x) => x.id === cardId).attachmentCount, 1, 'contador no quadro');
+
+  assert.equal((await membro.req('DELETE', `/api/attachments/${anexoId}`, {})).status, 200);
+  assert.equal((await membro.req('GET', `/api/cards/${cardId}/attachments`)).data.length, 0);
+
+  // Excluir o cartão apaga os anexos dele
+  const c2 = await membro.req('POST', `/api/boards/${boardId}/cards`, { listId: listIds[0], title: 'Cartão com anexo' });
+  await membro.req('POST', `/api/cards/${c2.data.id}/attachments`, { name: 'a.png', data: png.toString('base64') });
+  assert.equal((await membro.req('DELETE', `/api/cards/${c2.data.id}`, {})).status, 200);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM attachments WHERE card_id = ?').get(c2.data.id).n, 0);
+});
+
 test('somente admin acessa usuários e auditoria', async () => {
   assert.equal((await membro.req('GET', '/api/users')).status, 403);
   assert.equal((await membro.req('GET', '/api/dashboard/audit')).status, 403);

@@ -180,6 +180,25 @@ main:focus { outline: none; }
 .checklist-itens .btn { min-height: 32px; padding: 0 .5rem; flex: none; }
 .novo-item-linha { display: flex; gap: .5rem; }
 .novo-item-linha .btn { min-height: 36px; flex: none; }
+/* Anexos: contador com clipe no cartão e lista com miniaturas na janela do cartão */
+.cartao .marcas { display: inline-flex; align-items: center; gap: .6rem; }
+.anexo-qtd { display: inline-flex; align-items: center; gap: .3rem; font-family: var(--mono); font-size: .75rem; font-weight: 600; color: var(--texto-2); }
+.anexo-qtd::before { content: ""; width: .8rem; height: .8rem; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9'/%3E%3C/svg%3E") center / contain no-repeat; }
+.anexos { display: grid; gap: .6rem; border-top: 1px solid var(--linha); padding-top: .8rem; margin-bottom: .9rem; border-radius: var(--raio); }
+.anexos.alvo { outline: 2px dashed var(--azul-claro); outline-offset: 4px; background: rgba(77, 139, 240, .06); }
+.anexos > .ajuda { margin: 0; }
+.anexos-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.anexos-lista li { display: flex; gap: .75rem; align-items: center; padding: .5rem; background: var(--placa); border: 1px solid var(--borda); border-radius: var(--raio); }
+.anexo-miniatura { flex: none; width: 72px; height: 54px; display: grid; place-items: center; overflow: hidden; background: var(--componente); border: 1px solid var(--linha); border-radius: var(--raio); text-decoration: none; }
+.anexo-miniatura img { width: 100%; height: 100%; object-fit: cover; }
+.anexo-miniatura span { font-family: var(--mono); font-weight: 700; font-size: .8rem; color: var(--vermelho-texto); }
+.anexo-info { display: grid; gap: .1rem; min-width: 0; flex: 1; }
+.anexo-nome { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.anexo-acoes { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .15rem; }
+.anexo-acoes .btn { min-height: 32px; padding: 0 .55rem; display: inline-flex; align-items: center; text-decoration: none; font-size: .88rem; }
+.anexo-acoes .btn-perigo { color: var(--vermelho-texto); }
 .marcador { height: 2px; background: var(--azul-claro); }
 .coluna-vazia { display: grid; justify-items: center; gap: .6rem; padding: 1.6rem .5rem; text-align: center; }
 .coluna-vazia p { margin: 0; color: var(--texto-2); font-size: .82rem; max-width: 22ch; }
@@ -355,7 +374,7 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
       { id: 3, email: 'marina.membro@empresa.com.br', name: 'Marina Membro', role: 'membro' },
       { id: 4, email: 'lia.leitora@empresa.com.br', name: 'Lia Leitora', role: 'leitor' },
     ].map((u) => ({ ...u, password: 'Demo#2026-Teste', active: true, mustChangePassword: false, lockedUntil: null, lastLoginAt: null, createdAt: agora }));
-    const s = { seq: 100, users, boards: [], members: [], lists: [], cards: [], audit: [] };
+    const s = { seq: 100, users, boards: [], members: [], lists: [], cards: [], attachments: [], audit: [] };
     const projetos = [
       { code: 'PRJ-001', name: 'Roteirizador', area: 'Logística', sponsor: 'Diretoria de Operações', owner: 2, start: addDias(-45), due: addDias(75),
         desc: 'Ferramenta para gerar e otimizar rotas de entrega, reduzindo km rodado e tempo de planejamento.', membros: [1, 2, 3, 4],
@@ -400,6 +419,7 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
   let db = null;
   try { db = JSON.parse(ls.get(CHAVE)); } catch { db = null; }
   if (!db || !db.users) { db = semente(); salvar(); }
+  if (!db.attachments) db.attachments = []; // dados salvos antes de existir anexos
   function salvar() { ls.set(CHAVE, JSON.stringify(db)); }
 
   class Erro extends Error { constructor(status, msg, code) { super(msg); this.status = status; this.code = code; } }
@@ -412,6 +432,18 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
   }
   const ROLES = ['admin', 'gestor', 'membro', 'leitor'];
   const exigir = (cond, status, msg) => { if (!cond) throw new Erro(status, msg); };
+  // Anexos: na demonstração ficam no navegador, por isso o limite é menor (1 MB por arquivo).
+  const ANEXO_MAX_DEMO = 1024 * 1024;
+  // Tipo pelo conteúdo do arquivo (não pela extensão).
+  const tipoAnexo = (b) => {
+    const ini = (...x) => x.every((v, i) => b[i] === v);
+    if (ini(0x89, 0x50, 0x4E, 0x47)) return 'image/png';
+    if (ini(0xFF, 0xD8, 0xFF)) return 'image/jpeg';
+    if (ini(0x47, 0x49, 0x46, 0x38)) return 'image/gif';
+    if (ini(0x52, 0x49, 0x46, 0x46) && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+    if (ini(0x25, 0x50, 0x44, 0x46, 0x2D)) return 'application/pdf';
+    return null;
+  };
   // Checklists do cartão: até 10 por cartão, até 30 itens cada. Itens sem texto são descartados.
   const limparChecklists = (v) => {
     exigir(Array.isArray(v) && v.length <= 10, 400, 'Cada cartão pode ter no máximo 10 checklists.');
@@ -573,7 +605,7 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
           lists: db.lists.filter((l) => l.board_id === bid).sort((x, y) => x.position - y.position).map((l) => ({ id: l.id, name: l.name, position: l.position, isDone: l.is_done })),
           cards: db.cards.filter((c) => c.board_id === bid).sort((x, y) => x.position - y.position).map((c) => ({ id: c.id, listId: c.list_id, title: c.title, description: c.description,
             assigneeId: c.assignee_id, assigneeName: (userById(c.assignee_id) || {}).name || null, dueDate: c.due_date, priority: c.priority, phase: c.phase,
-            checklists: c.checklists || [], position: c.position, completedAt: c.completed_at, updatedAt: c.updated_at })),
+            checklists: c.checklists || [], attachmentCount: db.attachments.filter((a) => a.card_id === c.id).length, position: c.position, completedAt: c.completed_at, updatedAt: c.updated_at })),
           members: membros,
         };
       }
@@ -628,11 +660,46 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
       audit(u, 'lista.alterada', 'list', l.id, body); return { ok: true };
     }
 
+    // Anexos
+    if (p[0] === 'attachments' && method === 'DELETE') {
+      const a = db.attachments.find((x) => x.id === id(1)); exigir(a, 404, 'Anexo não encontrado.');
+      editar(acesso(u, a.board_id));
+      db.attachments = db.attachments.filter((x) => x.id !== a.id);
+      audit(u, 'cartao.anexo_excluido', 'card', a.card_id, { arquivo: a.name }); return { ok: true };
+    }
+
     // Cartões
     if (p[0] === 'cards') {
       const c = db.cards.find((x) => x.id === id(1)); exigir(c, 404, 'Cartão não encontrado.');
+      // Anexos: ver é para quem acessa o quadro; enviar exige poder editar.
+      if (p[2] === 'attachments' && method === 'GET') {
+        acesso(u, c.board_id);
+        return db.attachments.filter((a) => a.card_id === c.id).map((a) => {
+          const url = `data:${a.mime};base64,${a.data}`;
+          return { id: a.id, name: a.name, type: a.mime, size: a.size, createdAt: a.created_at,
+            authorName: (userById(a.created_by) || {}).name || null, url, downloadUrl: url };
+        });
+      }
       editar(acesso(u, c.board_id));
-      if (method === 'DELETE') { db.cards = db.cards.filter((x) => x.id !== c.id); audit(u, 'cartao.excluido', 'card', c.id, { title: c.title }); return { ok: true }; }
+      if (p[2] === 'attachments' && method === 'POST') {
+        const b64 = String(body.data || '');
+        const tamanho = Math.floor(b64.length * 3 / 4) - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
+        exigir(tamanho > 0, 400, 'Arquivo vazio.');
+        exigir(tamanho <= ANEXO_MAX_DEMO, 413, 'Na demonstração, cada arquivo pode ter até 1 MB (na plataforma, até 5 MB).');
+        let ini; try { ini = Uint8Array.from(atob(b64.slice(0, 24)), (ch) => ch.charCodeAt(0)); } catch { throw new Erro(400, 'Arquivo inválido.'); }
+        const tipo = tipoAnexo(ini);
+        exigir(tipo, 400, 'Tipo de arquivo não aceito. Envie imagem (PNG, JPG, WEBP, GIF) ou PDF.');
+        const nome = String(body.name ?? '').replace(/[\u0000-\u001f\u007f/\\]/g, '').trim().slice(0, 150) || 'arquivo';
+        const a = { id: ++db.seq, card_id: c.id, board_id: c.board_id, name: nome, mime: tipo, size: tamanho, data: b64, created_by: u.id, created_at: Date.now() };
+        db.attachments.push(a);
+        // O navegador tem pouco espaço: se não couber, desfaz e avisa.
+        try { localStorage.setItem(CHAVE, JSON.stringify(db)); } catch {
+          db.attachments.pop();
+          throw new Erro(413, 'O espaço da demonstração neste navegador acabou. Exclua anexos ou use "Restaurar dados iniciais".');
+        }
+        audit(u, 'cartao.anexo_incluido', 'card', c.id, { arquivo: nome }); return { id: a.id };
+      }
+      if (method === 'DELETE') { db.attachments = db.attachments.filter((a) => a.card_id !== c.id); db.cards = db.cards.filter((x) => x.id !== c.id); audit(u, 'cartao.excluido', 'card', c.id, { title: c.title }); return { ok: true }; }
       if (p[2] === 'move') {
         const alvo = db.lists.find((x) => x.id === body.listId && x.board_id === c.board_id); exigir(alvo, 400, 'Coluna inválida para este quadro.');
         const de = db.lists.find((x) => x.id === c.list_id);
@@ -801,7 +868,9 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
 
   async function api(method, url, body) {
     const opts = { method, credentials: 'same-origin', headers: {} };
-    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    // Pedidos que alteram dados vão sempre como JSON (mesmo sem conteúdo, como nas exclusões):
+    // a proteção CSRF do servidor próprio recusa o que não for JSON.
+    if (body !== undefined || method !== 'GET') { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body ?? {}); }
     if (method !== 'GET') opts.headers['X-CSRF-Token'] = state.csrf;
     const r = await fetch('/api' + url, opts);
     if (r.status === 401) { window.gpMostrarLogin(); throw new Error('Sessão expirada.'); }
@@ -1094,8 +1163,10 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
       el('span', { class: 'titulo', text: c.title }),
       el('span', { class: 'linha-base' },
         el('span', { class: 'resp', text: c.assigneeName || 'Sem responsável' }),
-        chk.total ? el('span', { class: 'check', dataset: { completo: chk.feitos === chk.total ? '1' : '0' },
-          'aria-label': `checklist: ${chk.feitos} de ${chk.total} itens marcados`, text: `${chk.feitos}/${chk.total}` }) : null));
+        el('span', { class: 'marcas' },
+          c.attachmentCount ? el('span', { class: 'anexo-qtd', 'aria-label': `${c.attachmentCount} ${c.attachmentCount === 1 ? 'anexo' : 'anexos'}`, text: String(c.attachmentCount) }) : null,
+          chk.total ? el('span', { class: 'check', dataset: { completo: chk.feitos === chk.total ? '1' : '0' },
+            'aria-label': `checklist: ${chk.feitos} de ${chk.total} itens marcados`, text: `${chk.feitos}/${chk.total}` }) : null)));
     if (perm.canEdit) {
       n.addEventListener('dragstart', (e) => { arrastado = c.id; n.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(c.id)); });
       n.addEventListener('dragend', () => { n.classList.remove('arrastando'); arrastado = null; });
@@ -1136,7 +1207,8 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
         campoEt('Responsável', c.assigneeName || 'Sem responsável'),
         campoEt('Fase', c.phase || 'Sem fase'),
         campoEt('Prazo', prazoLongo, { largo: true, mono: true }),
-        chkEt.total ? campoEt('Checklist', `${chkEt.feitos} de ${chkEt.total} itens marcados`, { largo: true }) : null),
+        chkEt.total ? campoEt('Checklist', `${chkEt.feitos} de ${chkEt.total} itens marcados`, { largo: true }) : null,
+        c.attachmentCount ? campoEt('Anexos', `${c.attachmentCount} ${c.attachmentCount === 1 ? 'arquivo' : 'arquivos'}`, { largo: true }) : null),
       el('div', { class: 'corpo' },
         c.description ? el('p', { class: 'descricao', text: c.description }) : null,
         el('ol', { class: 'etapas', 'aria-label': 'Etapas do cartão' }, d.lists.map((l, i) =>
@@ -1228,12 +1300,108 @@ input[type="checkbox"] { accent-color: var(--azul-claro); width: 16px; height: 1
     };
     desenharChecklists();
 
+    // Anexos (imagens e PDF): enviados na hora, sem esperar "Salvar cartão", porque o arquivo vai direto para o depósito.
+    const TIPOS_ANEXO = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'];
+    const areaAnexos = el('div', { class: 'anexos' });
+    const entradaArquivo = el('input', { type: 'file', accept: TIPOS_ANEXO.join(','), multiple: true, hidden: true,
+      onchange: (e) => { enviarArquivos([...e.target.files]); e.target.value = ''; } });
+    let anexos = null; let enviando = 0; let alterouAnexos = false;
+    const fmtTamanho = (n) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1).replace('.', ',')} MB`);
+    const paraBase64 = (arq) => new Promise((ok, falha) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result).split(',')[1] || '');
+      r.onerror = () => falha(new Error('Não foi possível ler o arquivo.'));
+      r.readAsDataURL(arq);
+    });
+    // Na demonstração os arquivos vêm como "data:"; o navegador não abre esse formato numa aba nova, então vira um link local (blob).
+    const linkLocal = async (url) => (url && url.startsWith('data:') ? URL.createObjectURL(await (await fetch(url)).blob()) : url);
+    const carregarAnexos = async () => {
+      try {
+        const lista = await api('GET', `/cards/${c.id}/attachments`);
+        anexos = await Promise.all(lista.map(async (a) => ({ ...a, url: await linkLocal(a.url), downloadUrl: await linkLocal(a.downloadUrl) })));
+      } catch (e) { anexos = []; erro.textContent = e.message; }
+      desenharAnexos();
+    };
+    const enviarArquivos = async (arquivos) => {
+      if (!c || !editavel || !arquivos.length) return;
+      erro.textContent = '';
+      for (const arq of arquivos) {
+        if (!TIPOS_ANEXO.includes(arq.type)) { erro.textContent = `"${arq.name}": envie imagem (PNG, JPG, WEBP, GIF) ou PDF.`; continue; }
+        if (arq.size > 5 * 1024 * 1024) { erro.textContent = `"${arq.name}" passa de 5 MB.`; continue; }
+        // Print colado com Ctrl+V chega sem nome útil ("image.png"): ganha um nome com data e hora.
+        const nome = /^image\.(png|jpe?g|gif|webp)$/i.test(arq.name || '') || !arq.name
+          ? `print-${new Date().toLocaleString('sv-SE').replace(/[: ]/g, '-')}.${arq.type.split('/')[1].replace('jpeg', 'jpg')}` : arq.name;
+        enviando++; desenharAnexos();
+        try {
+          await api('POST', `/cards/${c.id}/attachments`, { name: nome, data: await paraBase64(arq) });
+          alterouAnexos = true;
+        } catch (e) { erro.textContent = e.message; } finally { enviando--; }
+      }
+      await carregarAnexos();
+    };
+    const excluirAnexo = async (a) => {
+      if (!await confirmar(`Excluir o anexo "${a.name}"? Essa ação não pode ser desfeita.`)) return;
+      try { await api('DELETE', `/attachments/${a.id}`); alterouAnexos = true; await carregarAnexos(); } catch (e) { erro.textContent = e.message; }
+    };
+    const desenharAnexos = () => {
+      areaAnexos.replaceChildren(...[
+        el('div', { class: 'checklists-topo' }, el('span', { class: 'rotulo', text: 'Anexos' }),
+          c && editavel ? el('button', { class: 'btn btn-fantasma', type: 'button', text: '+ Anexar arquivo', onclick: () => entradaArquivo.click() }) : null),
+        !c ? el('p', { class: 'ajuda', text: 'Crie o cartão para poder anexar arquivos.' }) : null,
+        c && editavel ? el('p', { class: 'ajuda', text: 'Imagens (PNG, JPG, WEBP, GIF) ou PDF, até 5 MB. Também dá para colar um print com Ctrl+V ou arrastar o arquivo para esta janela.' }) : null,
+        enviando ? el('p', { class: 'ajuda', role: 'status', text: 'Enviando arquivo…' }) : null,
+        c && anexos === null ? el('p', { class: 'ajuda', text: 'Carregando anexos…' }) : null,
+        c && anexos && !anexos.length && !enviando ? el('p', { class: 'ajuda', text: 'Nenhum anexo.' }) : null,
+        c && anexos && anexos.length ? el('ul', { class: 'anexos-lista' }, anexos.map((a) => {
+          const imagem = a.type.startsWith('image/');
+          return el('li', {},
+            el('a', { class: 'anexo-miniatura', href: a.url, target: '_blank', rel: 'noopener', 'aria-label': `Abrir ${a.name}` },
+              imagem ? el('img', { src: a.url, alt: '', loading: 'lazy' }) : el('span', { text: 'PDF' })),
+            el('div', { class: 'anexo-info' },
+              el('span', { class: 'anexo-nome', text: a.name, title: a.name }),
+              el('span', { class: 'ajuda', text: [fmtTamanho(a.size), a.authorName, fmtHora(a.createdAt)].filter(Boolean).join(' · ') }),
+              el('span', { class: 'anexo-acoes' },
+                el('a', { class: 'btn btn-fantasma', href: a.url, target: '_blank', rel: 'noopener', text: 'Abrir' }),
+                el('a', { class: 'btn btn-fantasma', href: a.downloadUrl, download: a.name, text: 'Baixar' }),
+                editavel ? el('button', { class: 'btn btn-fantasma btn-perigo', type: 'button', text: 'Excluir', 'aria-label': `Excluir anexo ${a.name}`,
+                  onclick: () => excluirAnexo(a) }) : null)));
+        })) : null,
+        entradaArquivo,
+      ].filter(Boolean));
+    };
+    desenharAnexos();
+    if (c) {
+      carregarAnexos();
+      // Colar print (Ctrl+V) e arrastar arquivo valem enquanto a janela do cartão estiver aberta.
+      const aoColar = (e) => {
+        const arquivos = [...(e.clipboardData?.files || [])].filter((f) => TIPOS_ANEXO.includes(f.type));
+        if (!arquivos.length || !editavel) return;
+        e.preventDefault(); enviarArquivos(arquivos);
+      };
+      const aoArrastar = (e) => { if (editavel && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); areaAnexos.classList.add('alvo'); } };
+      const aoSoltar = (e) => {
+        areaAnexos.classList.remove('alvo');
+        if (!editavel || !e.dataTransfer?.files?.length) return;
+        e.preventDefault(); enviarArquivos([...e.dataTransfer.files]);
+      };
+      document.addEventListener('paste', aoColar);
+      dlg.addEventListener('dragover', aoArrastar);
+      dlg.addEventListener('drop', aoSoltar);
+      dlg.addEventListener('close', () => {
+        document.removeEventListener('paste', aoColar);
+        dlg.removeEventListener('dragover', aoArrastar);
+        dlg.removeEventListener('drop', aoSoltar);
+        if (alterouAnexos) rotear(); // atualiza o contador de anexos no quadro
+      }, { once: true });
+    }
+
     const corpo = [
       campo('Título', f.title), campo('Descrição', f.description),
       el('div', { class: 'grade-2' }, campo('Coluna', f.listId), campo('Responsável', f.assigneeId),
         campo('Prazo', f.dueDate), campo('Prioridade', f.priority)),
       campo('Fase do projeto', f.phase),
       areaCheck,
+      areaAnexos,
       c ? el('p', { class: 'ajuda', text: `Última alteração em ${fmtHora(c.updatedAt)}` }) : null,
       erro,
     ];
