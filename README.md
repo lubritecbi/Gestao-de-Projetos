@@ -44,9 +44,14 @@ A senha de um usuário não pode ser lida, só substituída: pelo botão **Redef
 
 ### Backup e restauração (Supabase)
 
-O fluxo `.github/workflows/backup-supabase.yml` roda segunda, quarta e sexta de madrugada. Ele conecta no banco (o que mantém o projeto gratuito ativo) e gera um backup **criptografado com AES-256**, guardado por 30 dias na aba **Actions** (execução > **Artifacts**). Como o repositório é público, sem a senha o arquivo é inútil.
+O fluxo `.github/workflows/backup-supabase.yml` roda segunda, quarta e sexta de madrugada. Ele conecta no banco (o que mantém o projeto gratuito ativo) e gera dois arquivos **criptografados com AES-256**, guardados juntos por 30 dias na aba **Actions** (execução > **Artifacts**). Como o repositório é público, sem a senha os arquivos são inúteis.
 
-**Atenção:** esse backup copia o banco (inclusive a lista de anexos), mas **não** os arquivos anexados, que ficam no Storage do Supabase. Para guardar uma cópia dos arquivos, baixe-os em Supabase > Storage > `anexos`.
+| Arquivo | O que tem |
+|---|---|
+| `gestao-supabase-AAAA-MM-DD_HHMM.tar.gz.gpg` | Banco: estrutura, dados (inclusive checklists e a lista de anexos) e logins |
+| `gestao-anexos-AAAA-MM-DD_HHMM.tar.gpg` | Os arquivos anexados aos cartões (imagens e PDF), nas mesmas pastas do Storage |
+
+Os arquivos dos anexos ficam no Storage do Supabase, fora do banco. Por isso a cópia deles usa o segredo `SUPABASE_SECRET_KEY`. Sem esse segredo, o backup do banco é feito normalmente e a execução mostra o aviso "Anexos NÃO copiados". Se a cópia dos anexos falhar, o backup do banco é guardado mesmo assim.
 
 Configuração única, em **Settings > Secrets and variables > Actions > New repository secret**:
 
@@ -54,13 +59,15 @@ Configuração única, em **Settings > Secrets and variables > Actions > New rep
 |---|---|
 | `SUPABASE_DB_URL` | Supabase > **Connect** > **Session pooler** > URI, trocando `[YOUR-PASSWORD]` pela senha do banco |
 | `BACKUP_PASSPHRASE` | Uma frase longa (20+ caracteres). **Guarde fora do GitHub**: sem ela não há como abrir os backups |
+| `SUPABASE_SECRET_KEY` | Supabase > **Project Settings** > **API Keys** > **Secret keys** (começa com `sb_secret_`; crie uma chamada "backup"). Usada só para baixar os anexos. Nunca coloque essa chave em arquivos do repositório |
 
 Restaurar (num projeto novo ou após um problema):
 
 1. Baixe o artifact e descriptografe: `gpg -d gestao-supabase-AAAA-MM-DD_HHMM.tar.gz.gpg | tar -xz` (no Windows, use o Gpg4win e o 7-Zip). Saem `02_logins.sql`, `01_sistema.sql` e `resumo.txt`.
 2. Rode, nesta ordem, no SQL Editor (ou com `psql`): `02_logins.sql`, `01_sistema.sql` e `supabase/04_restaurar_gatilho.sql`. Se algum passo der erro, pare: as regras de permissão são aplicadas no fim do `01_sistema.sql`.
 3. Confira os totais mostrados pelo `04_restaurar_gatilho.sql` com o `resumo.txt`.
-4. Se for um projeto novo: republique a Edge Function, refaça as configurações de Authentication (cadastro público desligado, política de senha, Site URL) e atualize `web/config.js` com a nova Project URL e chave pública.
+4. Anexos: descriptografe o segundo arquivo com `gpg -d gestao-anexos-AAAA-MM-DD_HHMM.tar.gpg | tar -x`. Sai uma pasta `anexos` com subpastas numeradas (projeto/cartão). Rode `supabase/06_anexos.sql` (se for um projeto novo) e, em Supabase > **Storage** > `anexos`, envie as subpastas numeradas mantendo os mesmos nomes. A lista de anexos já volta com o `01_sistema.sql`.
+5. Se for um projeto novo: republique a Edge Function, refaça as configurações de Authentication (cadastro público desligado, política de senha, Site URL) e atualize `web/config.js` com a nova Project URL e chave pública.
 
 Atenção: o GitHub desliga tarefas agendadas de repositórios públicos após 60 dias sem nenhum commit e avisa por e-mail. Se isso acontecer, reative em **Actions > Backup do Supabase > Enable workflow**.
 

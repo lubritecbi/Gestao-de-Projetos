@@ -1,4 +1,4 @@
-# Backup do banco no Supabase + mantém o projeto gratuito "acordado".
+# Backup do banco e dos anexos no Supabase + mantém o projeto gratuito "acordado".
 # ---------------------------------------------------------------------
 # Por quê: o plano gratuito do Supabase pausa o projeto após ~7 dias sem
 # uso. Esta tarefa conecta no banco 3 vezes por semana (o que conta como
@@ -12,6 +12,13 @@
 # Segredos necessários (Settings > Secrets and variables > Actions):
 #   SUPABASE_DB_URL     -> string de conexão "Session pooler" do Supabase, com a senha do banco
 #   BACKUP_PASSPHRASE   -> senha longa para criptografar o backup (guarde fora do GitHub!)
+#   SUPABASE_SECRET_KEY -> chave "secret" do projeto (Project Settings > API Keys), usada SÓ para
+#                          baixar os arquivos dos anexos do Storage. Sem ela, o backup do banco é
+#                          feito normalmente e o fluxo avisa que os anexos não foram copiados.
+#
+# Saem dois arquivos criptografados no mesmo "artifact":
+#   gestao-supabase-<data>.tar.gz.gpg -> banco (estrutura, dados e logins)
+#   gestao-anexos-<data>.tar.gpg      -> arquivos dos anexos (imagens e PDF), nas mesmas pastas do Storage
 #
 # Como restaurar: veja a seção "Backup e restauração" do README.
 name: Backup do Supabase
@@ -31,11 +38,18 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
+      # Só para ler o endereço do projeto (Project URL) em web/config.js.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: web/config.js
+          sparse-checkout-cone-mode: false
+
       - name: Conferir segredos
         run: |
           if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
@@ -52,6 +66,7 @@ jobs:
           set -euo pipefail
           umask 077
           DATA=$(date -u +%Y-%m-%d_%H%M)
+          echo "DATA=$DATA" >> "$GITHUB_ENV"   # mesma data no nome do backup dos anexos
           mkdir -p saida tmp
           chmod 777 tmp   # o contêiner do PostgreSQL grava aqui
 
@@ -74,7 +89,8 @@ jobs:
           select 'quadros=' || (select count(*) from public.boards)
               || ' cartoes=' || (select count(*) from public.cards)
               || ' usuarios=' || (select count(*) from public.profiles)
-              || ' auditoria=' || (select count(*) from public.audit_log);
+              || ' auditoria=' || (select count(*) from public.audit_log)
+              || ' anexos=' || coalesce((select count(*) from public.card_attachments), 0);
           SQL
           pg "$IMG" 'psql "$DBURL" -tA -f /out/resumo.sql > /out/resumo.txt'
 
@@ -91,7 +107,61 @@ jobs:
           rm -rf tmp
           ls -lh saida
 
+      # Os arquivos dos anexos ficam no Storage, fora do banco: o pg_dump acima não os copia.
+      - name: Copiar arquivos dos anexos (criptografado)
+        run: |
+          set -euo pipefail
+          umask 077
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::warning::Anexos NÃO copiados: cadastre o segredo SUPABASE_SECRET_KEY (Supabase > Project Settings > API Keys > Secret keys). O backup do banco foi feito normalmente."
+            exit 0
+          fi
+          URL=$(sed -n "s/^ *url: *'\(https:[^']*\)'.*/\1/p" web/config.js)
+          if [ -z "$URL" ]; then echo "::error::Não achei a Project URL em web/config.js."; exit 1; fi
+          mkdir -p tmp/anexos saida
+          chmod 777 tmp
+
+          # Lista dos arquivos do depósito "anexos", lida direto do banco.
+          docker run --rm -e DBURL="$SUPABASE_DB_URL" -e PGCONNECT_TIMEOUT=30 -v "$PWD/tmp:/out" postgres:17-alpine \
+            sh -c 'psql "$DBURL" -tA -c "select name from storage.objects where bucket_id = '"'"'anexos'"'"' order by name" > /out/lista.txt'
+          TOTAL=$(grep -c . tmp/lista.txt || true)
+          echo "Arquivos no depósito: $TOTAL"
+          if [ "$TOTAL" -eq 0 ]; then echo "Nenhum anexo para copiar."; rm -rf tmp; exit 0; fi
+
+          # A chave vai num arquivo de cabeçalhos (não aparece na linha de comando).
+          # Chave nova (sb_secret_...) vai só no "apikey"; a antiga (service_role, eyJ...) também no Authorization.
+          printf 'apikey: %s\n' "$SUPABASE_SECRET_KEY" > tmp/cab.txt
+          case "$SUPABASE_SECRET_KEY" in eyJ*) printf 'Authorization: Bearer %s\n' "$SUPABASE_SECRET_KEY" >> tmp/cab.txt ;; esac
+
+          OK=0; FALHAS=0
+          while IFS= read -r CAMINHO; do
+            # Só caminhos no formato gravado pelo sistema: <quadro>/<cartão>/<id>.<extensão>
+            if ! [[ "$CAMINHO" =~ ^[0-9]+/[0-9]+/[0-9a-fA-F-]+\.(png|jpg|webp|gif|pdf)$ ]]; then
+              echo "::warning::Ignorado (nome fora do padrão): $CAMINHO"; FALHAS=$((FALHAS + 1)); continue
+            fi
+            mkdir -p "tmp/anexos/$(dirname "$CAMINHO")"
+            if curl -fsS --retry 3 --retry-delay 2 -H @tmp/cab.txt \
+                 "$URL/storage/v1/object/authenticated/anexos/$CAMINHO" -o "tmp/anexos/$CAMINHO"; then
+              OK=$((OK + 1))
+            else
+              echo "::warning::Falha ao baixar: $CAMINHO"; FALHAS=$((FALHAS + 1)); rm -f "tmp/anexos/$CAMINHO"
+            fi
+          done < tmp/lista.txt
+          rm -f tmp/cab.txt
+          echo "Anexos copiados: $OK de $TOTAL (falhas: $FALHAS)"
+          if [ "$OK" -eq 0 ]; then echo "::error::Nenhum anexo foi baixado. Confira o segredo SUPABASE_SECRET_KEY."; exit 1; fi
+          if [ "$FALHAS" -gt 0 ]; then echo "::warning::$FALHAS anexo(s) não foram copiados. Veja os avisos acima."; fi
+
+          # Imagens e PDF já são compactados: empacota sem comprimir de novo e criptografa (AES-256).
+          tar -C tmp -cf - anexos | gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase-fd 3 3<<<"$BACKUP_PASSPHRASE" \
+            -o "saida/gestao-anexos-$DATA.tar.gpg"
+          rm -rf tmp
+          ls -lh saida
+
+      # Roda mesmo se a cópia dos anexos falhar: o backup do banco nunca se perde por causa dela.
       - name: Guardar backup (30 dias)
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: backup-supabase-${{ github.run_number }}

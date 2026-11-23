@@ -26,7 +26,7 @@ painel de desempenho e auditoria.
   - Scripts do banco em supabase/: 01_banco, 02_primeiro_admin, 03_ajustes_telas, 04_restaurar_gatilho,
     05_checklists (coluna "checklists" nos cartões: várias checklists com nome e itens),
     06_anexos (anexos nos cartões: depósito privado "anexos" no Storage, tabela card_attachments;
-    imagens e PDF até 5 MB; o backup automático NÃO copia os arquivos do Storage).
+    imagens e PDF até 5 MB).
 - Na página só vai a chave pública (publishable). A chave secreta NUNCA vai para o GitHub.
 - Versão alternativa com servidor próprio (Node.js 22 + Express + SQLite) em src/ e public/,
   para uma futura hospedagem pela TI.
@@ -36,8 +36,10 @@ painel de desempenho e auditoria.
   Custom domain vazio). Todo push na main publica.
 - Backup: .github/workflows/backup-supabase.yml, seg/qua/sex, criptografado (AES-256),
   30 dias em Actions > Artifacts; também mantém o Supabase ativo.
-  Segredos: SUPABASE_DB_URL (Session pooler; senha do banco só letras e números)
-  e BACKUP_PASSPHRASE (guardada fora do GitHub).
+  Gera dois arquivos: gestao-supabase-*.tar.gz.gpg (banco) e gestao-anexos-*.tar.gpg (arquivos do Storage).
+  Segredos: SUPABASE_DB_URL (Session pooler; senha do banco só letras e números),
+  BACKUP_PASSPHRASE (guardada fora do GitHub) e SUPABASE_SECRET_KEY (chave "secret" do Supabase,
+  só para baixar os anexos; sem ela o backup do banco segue e o fluxo avisa).
 
 ## Documentação
 README.md, SECURITY.md e PDF "Gestao-de-Projetos-Documentacao" (versão 1.1, nov/2026).
