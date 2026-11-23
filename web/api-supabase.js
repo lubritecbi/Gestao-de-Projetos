@@ -117,9 +117,22 @@
   async function adminUsuarios(corpo) {
     const { data, error } = await sb.functions.invoke('admin-usuarios', { body: corpo });
     if (error) {
-      let msg = 'Não foi possível concluir. Tente novamente.'; let status = 500;
-      try { const r = error.context; status = r.status || 500; msg = (await r.json()).error || msg; } catch { /* sem corpo */ }
-      throw new Erro(status, msg);
+      const r = error.context;
+      // Sem resposta (rede caiu ou o navegador bloqueou a chamada)
+      if (!r || typeof r.json !== 'function') {
+        throw new Erro(503, 'Não foi possível falar com a função "admin-usuarios" (rede ou bloqueio do navegador). Tente novamente.');
+      }
+      let corpo = {};
+      try { corpo = await r.json(); } catch { /* resposta sem JSON */ }
+      // Resposta da própria função: a mensagem já vem pronta em português.
+      if (corpo.error) throw new Erro(r.status || 500, corpo.error);
+      // Resposta do Supabase, antes de a função rodar: mostra o motivo real para facilitar o diagnóstico.
+      // Por quê o status muda para 502: um 401 aqui não é sessão expirada, e não deve tirar o admin do sistema.
+      const detalhe = corpo.message || corpo.msg || corpo.code || '';
+      const msg = r.status === 404
+        ? 'A função "admin-usuarios" não foi encontrada no Supabase. Confira se ela está publicada em Edge Functions.'
+        : `A função "admin-usuarios" não rodou: o Supabase respondeu ${r.status}${detalhe ? ` (${detalhe})` : ''}. Veja os logs da função no Supabase.`;
+      throw new Erro(502, msg);
     }
     return data;
   }
