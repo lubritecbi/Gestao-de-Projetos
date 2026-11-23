@@ -106,7 +106,7 @@
     const itens = [['#/', 'Quadros'], ['#/desempenho', 'Desempenho']];
     if (state.me.role === 'admin') itens.push(['#/usuarios', 'Usuários'], ['#/auditoria', 'Auditoria']);
     document.getElementById('nav').replaceChildren(...itens.map(([h, t]) =>
-      el('a', { href: h, text: t, 'aria-current': (h === '#/' ? (rota === '' || rota.startsWith('quadro')) : rota.startsWith(h.slice(2))) ? 'page' : null })));
+      el('a', { href: h, text: t, 'aria-current': (h === '#/' ? (rota === '' || rota.startsWith('quadro') || rota === 'arquivados') : rota.startsWith(h.slice(2))) ? 'page' : null })));
   }
 
   async function rotear() {
@@ -115,6 +115,7 @@
     dlg.open && dlg.close();
     try {
       if (rota.startsWith('quadro/')) await telaQuadro(Number(rota.split('/')[1]));
+      else if (rota === 'arquivados' && state.me.role === 'admin') await telaArquivados();
       else if (rota === 'desempenho') await telaDesempenho();
       else if (rota === 'usuarios' && state.me.role === 'admin') await telaUsuarios();
       else if (rota === 'auditoria' && state.me.role === 'admin') await telaAuditoria();
@@ -132,7 +133,9 @@
     app.replaceChildren(
       el('div', { class: 'cabecalho' },
         el('div', {}, el('h1', { text: 'Quadros de projeto' }), el('p', { text: 'Cada projeto é um quadro. Abra um quadro para mover as atividades entre as colunas.' })),
-        podeCriar ? el('button', { class: 'btn btn-primario', type: 'button', text: 'Novo projeto', onclick: () => dialogoQuadro() }) : null),
+        el('div', { class: 'acoes' },
+          state.me.role === 'admin' ? el('a', { class: 'btn', href: '#/arquivados', text: 'Projetos arquivados' }) : null,
+          podeCriar ? el('button', { class: 'btn btn-primario', type: 'button', text: 'Novo projeto', onclick: () => dialogoQuadro() }) : null)),
       quadros.length
         ? el('div', { class: 'quadros' }, quadros.map((q) => {
           const barra = el('span'); barra.style.width = pct(q.pct);
@@ -199,7 +202,7 @@
       } catch (e) { erro.textContent = e.message; }
     };
     const arquivar = tentar(async () => {
-      if (!await confirmar('Arquivar este projeto? Ele sai da lista para todos os membros.')) return;
+      if (!await confirmar('Arquivar este projeto? Ele sai da lista de quadros de todos os membros. Nada é apagado: o administrador consulta e desarquiva em "Projetos arquivados".')) return;
       await api('DELETE', `/boards/${b.id}`); dlg.close(); aviso('Projeto arquivado.'); location.hash = '#/';
     });
     abrirDialogo(b ? 'Editar projeto' : 'Novo projeto', corpo, [
@@ -211,6 +214,38 @@
 
   // ---------- tela: quadro kanban + etiqueta ----------
   let cartaoSel = null;
+
+  // ---------- tela: projetos arquivados (só administrador) ----------
+  // Arquivar não apaga nada: aqui o admin consulta (somente leitura) e desarquiva.
+  async function desarquivar(b) {
+    if (!await confirmar(`Desarquivar o projeto ${b.code} ${b.name}? Ele volta para a lista de quadros de todos os membros.`)) return false;
+    await api('POST', `/boards/${b.id}/unarchive`);
+    aviso('Projeto desarquivado.');
+    return true;
+  }
+  async function telaArquivados() {
+    const quadros = await api('GET', '/boards/archived');
+    app.replaceChildren(
+      el('div', { class: 'cabecalho' },
+        el('div', {}, el('h1', { text: 'Projetos arquivados' }),
+          el('p', { text: 'Arquivar não apaga nada: cartões, checklists, anexos e histórico continuam guardados. Abra para consultar (somente leitura) ou desarquive para voltar a usar.' })),
+        el('div', { class: 'acoes' }, el('a', { class: 'btn', href: '#/', text: 'Voltar aos quadros' }))),
+      quadros.length
+        ? el('section', { class: 'secao' }, el('div', { class: 'rolagem' }, el('table', {},
+          el('thead', {}, el('tr', {}, ['Projeto', 'Responsável', 'Área', 'Atividades', 'Arquivado em', ''].map((h, i) => el('th', { class: i === 3 ? 'num' : null, text: h })))),
+          el('tbody', {}, quadros.map((b) => el('tr', {},
+            el('td', {}, el('a', { href: `#/quadro/${b.id}`, text: `${b.code} ${b.name}` })),
+            el('td', { text: b.ownerName || '' }),
+            el('td', { text: b.area || '' }),
+            el('td', { class: 'num', text: `${b.done}/${b.total}` }),
+            el('td', { text: fmtHora(b.archivedAt).slice(0, 10) }),
+            el('td', { class: 'acoes-linha' },
+              el('a', { class: 'btn btn-fantasma', href: `#/quadro/${b.id}`, text: 'Abrir' }),
+              el('button', { class: 'btn btn-fantasma', type: 'button', text: 'Desarquivar',
+                onclick: tentar(async () => { if (await desarquivar(b)) rotear(); }) }))))))))
+        : el('div', { class: 'vazio', text: 'Nenhum projeto arquivado.' }),
+    );
+  }
 
   async function telaQuadro(id) {
     const d = await api('GET', `/boards/${id}`);
@@ -244,6 +279,12 @@
             onclick: tentar(async () => { await carregarDiretorio(); dialogoQuadro(b, d.members); }) }) : null,
           perm.canEdit && d.lists.length ? el('button', { class: 'btn btn-primario', type: 'button', text: 'Adicionar cartão',
             onclick: () => dialogoCartao(null, d, d.lists[0].id) }) : null)),
+      b.archived ? el('div', { class: 'faixa-arquivado', role: 'status' },
+        el('span', {}, el('strong', { text: 'Projeto arquivado · somente leitura.' }), ' Nada pode ser alterado até ele ser desarquivado.'),
+        el('span', { class: 'acoes' },
+          el('a', { class: 'btn btn-fantasma', href: '#/arquivados', text: 'Ver arquivados' }),
+          state.me.role === 'admin' ? el('button', { class: 'btn', type: 'button', text: 'Desarquivar',
+            onclick: tentar(async () => { if (await desarquivar(b)) rotear(); }) }) : null)) : null,
       el('div', { class: 'progresso', role: 'img', 'aria-label': `${pct(b.pct)} concluído` }, barra),
       el('div', { class: 'oculto', id: 'instr-dnd', text: 'Selecione o cartão e use Avançar etapa ou Voltar etapa na etiqueta ao lado.' }),
       el('div', { class: 'area-quadro' }, el('div', { class: 'kanban-rolagem' }, kanban), painel),

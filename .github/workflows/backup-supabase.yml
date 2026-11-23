@@ -20,6 +20,10 @@
 #   gestao-supabase-<data>.tar.gz.gpg -> banco (estrutura, dados e logins)
 #   gestao-anexos-<data>.tar.gpg      -> arquivos dos anexos (imagens e PDF), nas mesmas pastas do Storage
 #
+# Pausa de 60 dias: o GitHub desliga tarefas agendadas de repositórios públicos após 60 dias
+# sem commits. Sem esta tarefa, ninguém conecta no banco e o Supabase gratuito pausa em ~7 dias.
+# Por isso o primeiro passo pede ao GitHub para manter esta tarefa ligada, o que zera esse contador.
+#
 # Como restaurar: veja a seção "Backup e restauração" do README.
 name: Backup do Supabase
 
@@ -30,6 +34,7 @@ on:
 
 permissions:
   contents: read
+  actions: write   # só para manter esta tarefa agendada ligada (passo "Manter a tarefa agendada ativa")
 
 concurrency:
   group: backup-supabase
@@ -44,6 +49,14 @@ jobs:
       BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
+      # Zera o contador de 60 dias sem atividade do GitHub (roda mesmo se o backup falhar depois).
+      - name: Manter a tarefa agendada ativa
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PUT "repos/${{ github.repository }}/actions/workflows/backup-supabase.yml/enable"
+          echo "Tarefa agendada mantida ativa: contador de 60 dias sem atividade reiniciado."
+
       # Só para ler o endereço do projeto (Project URL) em web/config.js.
       - uses: actions/checkout@v4
         with:

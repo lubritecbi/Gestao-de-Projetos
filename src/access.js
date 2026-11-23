@@ -35,11 +35,17 @@ function requireRole(...roles) {
 }
 
 const qBoard = db.prepare('SELECT * FROM boards WHERE id = ? AND archived = 0');
+const qBoardArquivado = db.prepare('SELECT * FROM boards WHERE id = ? AND archived = 1');
 const qMember = db.prepare('SELECT 1 FROM board_members WHERE board_id = ? AND user_id = ?');
 
-function boardAccess(user, boardId) {
+// verArquivado: só para consultas. O admin pode ver um projeto arquivado, sempre somente leitura.
+function boardAccess(user, boardId, { verArquivado = false } = {}) {
   const board = qBoard.get(boardId);
-  if (!board) throw new HttpError(404, 'Quadro não encontrado.');
+  if (!board) {
+    const arquivado = verArquivado && user.role === 'admin' ? qBoardArquivado.get(boardId) : null;
+    if (arquivado) return { board: arquivado, canEdit: false, canManage: false, archived: true };
+    throw new HttpError(404, 'Quadro não encontrado.');
+  }
   const isAdmin = user.role === 'admin';
   const isMember = !!qMember.get(boardId, user.id);
   // Responde 404 (e não 403) para não revelar a existência de quadros alheios.

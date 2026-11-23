@@ -289,7 +289,24 @@
         }));
         return Array.isArray(r) ? r[0] : r;
       }
+      // Projetos arquivados: só o administrador vê (somente leitura).
+      if (p[1] === 'archived' && method === 'GET') {
+        exigir(eu.role === 'admin', 403, SEM_PERMISSAO);
+        const quadros = ok(await sb.from('boards').select('id, code, name, area, updated_at, owner:profiles!boards_owner_id_fkey(name)').eq('archived', true).order('code'));
+        const ids = quadros.map((b) => b.id);
+        const cs = ids.length ? ok(await sb.from('cards').select('board_id, list:lists(is_done)').in('board_id', ids)) : [];
+        return quadros.map((b) => {
+          const meus = cs.filter((c) => c.board_id === b.id);
+          return { id: b.id, code: b.code, name: b.name, area: b.area, ownerName: b.owner?.name ?? null, archivedAt: ms(b.updated_at),
+            total: meus.length, done: meus.filter((c) => c.list?.is_done).length };
+        });
+      }
       const boardId = num(p[1]);
+      if (p[2] === 'unarchive' && method === 'POST') {
+        exigir(eu.role === 'admin', 403, SEM_PERMISSAO);
+        ok(await sb.rpc('desarquivar_quadro', { p_board: boardId }));
+        return { ok: true };
+      }
 
       if (!p[2] && method === 'GET') {
         const [qb, ql, qc, qm, qa] = await Promise.all([
@@ -302,16 +319,31 @@
         // Total de anexos por cartão. Se a tabela ainda não existir (06_anexos.sql não rodado), fica 0.
         const anexosPorCartao = {};
         for (const a of qa.error ? [] : qa.data) anexosPorCartao[a.card_id] = (anexosPorCartao[a.card_id] || 0) + 1;
-        const b = ok(qb); exigir(b, 404, 'Quadro não encontrado.');
+        let b = ok(qb);
+        let arquivado = false;
+        if (!b && eu.role === 'admin') {
+          // Projeto arquivado: monta o resumo a partir das próprias colunas e cartões.
+          const a = ok(await sb.from('boards').select('*, owner:profiles!boards_owner_id_fkey(name)').eq('id', boardId).eq('archived', true).maybeSingle());
+          if (a) {
+            const feitas = new Set(ok(ql).filter((l) => l.is_done).map((l) => l.id));
+            const cs = ok(qc); const hj = hojeSP();
+            const { owner, ...resto } = a;
+            b = { ...resto, owner_name: owner?.name ?? null, total: cs.length, done: cs.filter((c) => feitas.has(c.list_id)).length,
+              overdue: cs.filter((c) => !feitas.has(c.list_id) && c.due_date && c.due_date < hj).length };
+            arquivado = true;
+          }
+        }
+        exigir(b, 404, 'Quadro não encontrado.');
         const membros = ok(qm).map((m) => m.user).filter((u) => u && u.active)
           .map(({ active, ...u }) => u).sort((a, c) => a.name.localeCompare(c.name));
         const souMembro = membros.some((m) => m.id === eu.id);
         const admin = eu.role === 'admin';
         return {
-          board: resumoQuadro(b),
+          board: { ...resumoQuadro(b), archived: arquivado },
+          // Arquivado: somente leitura, para todos.
           permissions: {
-            canEdit: admin || (souMembro && eu.role !== 'leitor'),
-            canManage: admin || (souMembro && eu.role === 'gestor'),
+            canEdit: !arquivado && (admin || (souMembro && eu.role !== 'leitor')),
+            canManage: !arquivado && (admin || (souMembro && eu.role === 'gestor')),
           },
           lists: ok(ql).map((l) => ({ id: l.id, name: l.name, position: l.position, isDone: l.is_done })),
           cards: ok(qc).map((c) => ({ id: c.id, listId: c.list_id, title: c.title, description: c.description,

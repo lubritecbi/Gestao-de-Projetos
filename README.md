@@ -28,7 +28,7 @@ O GitHub Pages só hospeda arquivos estáticos. Por isso, nessa versão:
 | Telas | GitHub Pages | `web/` (mesmas telas de `public/`, com caminhos relativos) |
 | Ponte telas → Supabase | GitHub Pages | `web/api-supabase.js` responde às chamadas `/api/...` das telas usando o Supabase |
 | Login e senhas | Supabase Auth | cadastro público desligado; só o admin cria acessos |
-| Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql`, `supabase/05_checklists.sql` (checklists nos cartões), `supabase/06_anexos.sql` (anexos nos cartões) |
+| Banco e permissões | Supabase (PostgreSQL + RLS) | `supabase/01_banco.sql`, `supabase/03_ajustes_telas.sql`, `supabase/05_checklists.sql` (checklists nos cartões), `supabase/06_anexos.sql` (anexos nos cartões), `supabase/07_arquivados.sql` (consulta e desarquivamento de projetos) |
 | Anexos dos cartões (imagens e PDF) | Supabase Storage (depósito privado `anexos`) | `supabase/06_anexos.sql`; até 5 MB por arquivo; só membros do projeto abrem ou baixam |
 | Primeiro administrador | Supabase | `supabase/02_primeiro_admin.sql` |
 | Backup e manter ativo | GitHub Actions | `.github/workflows/backup-supabase.yml`, `supabase/04_restaurar_gatilho.sql` |
@@ -69,7 +69,9 @@ Restaurar (num projeto novo ou após um problema):
 4. Anexos: descriptografe o segundo arquivo com `gpg -d gestao-anexos-AAAA-MM-DD_HHMM.tar.gpg | tar -x`. Sai uma pasta `anexos` com subpastas numeradas (projeto/cartão). Rode `supabase/06_anexos.sql` (se for um projeto novo) e, em Supabase > **Storage** > `anexos`, envie as subpastas numeradas mantendo os mesmos nomes. A lista de anexos já volta com o `01_sistema.sql`.
 5. Se for um projeto novo: republique a Edge Function, refaça as configurações de Authentication (cadastro público desligado, política de senha, Site URL) e atualize `web/config.js` com a nova Project URL e chave pública.
 
-Atenção: o GitHub desliga tarefas agendadas de repositórios públicos após 60 dias sem nenhum commit e avisa por e-mail. Se isso acontecer, reative em **Actions > Backup do Supabase > Enable workflow**.
+Pausa de 60 dias: o GitHub desliga tarefas agendadas de repositórios públicos após 60 dias sem commits. Sem o backup, ninguém conecta no banco e o Supabase gratuito pausa em cerca de 7 dias. Por isso o primeiro passo do backup ("Manter a tarefa agendada ativa") pede ao GitHub, a cada execução, para manter a tarefa ligada, o que zera esse contador. Se mesmo assim ela for desligada (o GitHub avisa por e-mail), reative em **Actions > Backup do Supabase > Enable workflow**.
+
+Recomendação: uma vez por mês, baixe o artifact mais recente e guarde fora do GitHub (os artifacts expiram em 30 dias).
 
 Para rodar com servidor próprio (Node.js + SQLite), siga as seções de instalação abaixo.
 
@@ -77,7 +79,7 @@ Para rodar com servidor próprio (Node.js + SQLite), siga as seções de instala
 
 | Área | Recursos |
 |---|---|
-| Quadros | Um quadro por projeto, colunas editáveis (A fazer, Em andamento, Em validação, Concluído), cartões com responsável, prazo, prioridade, fase, checklists (várias por cartão, com contador de itens marcados no quadro) e anexos (imagens e PDF até 5 MB: botão, Ctrl+V para colar print ou arrastar o arquivo); etiqueta do cartão ao lado com botões para avançar ou voltar etapa; arrastar e soltar |
+| Quadros | Um quadro por projeto, colunas editáveis (A fazer, Em andamento, Em validação, Concluído), cartões com responsável, prazo, prioridade, fase, checklists (várias por cartão, com contador de itens marcados no quadro) e anexos (imagens e PDF até 5 MB: botão, Ctrl+V para colar print ou arrastar o arquivo); etiqueta do cartão ao lado com botões para avançar ou voltar etapa; arrastar e soltar. Projetos arquivados não são apagados: o administrador consulta (somente leitura) e desarquiva em **Projetos arquivados** |
 | Desempenho | % concluído e farol por projeto (mesma regra da planilha), atividades atrasadas, entregas por semana, carga e pontualidade por pessoa |
 | Usuários | Somente o administrador cria acessos; senha temporária com troca obrigatória; redefinir senha, desbloquear, desativar, mudar perfil |
 | Auditoria | Registro de logins, falhas, bloqueios, alterações de usuários, projetos e cartões, com IP e horário |

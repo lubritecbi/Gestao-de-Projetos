@@ -118,7 +118,7 @@ function cardForView(req) {
   const cardId = parse(id, req.params.id);
   const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId);
   if (!card) throw new HttpError(404, 'Cartão não encontrado.');
-  boardAccess(req.user, card.board_id);
+  boardAccess(req.user, card.board_id, { verArquivado: true });
   return card;
 }
 
@@ -152,7 +152,7 @@ router.get('/attachments/:id', (req, res, next) => {
   try {
     const a = db.prepare('SELECT * FROM attachments WHERE id = ?').get(parse(id, req.params.id));
     if (!a) throw new HttpError(404, 'Anexo não encontrado.');
-    boardAccess(req.user, a.board_id);
+    boardAccess(req.user, a.board_id, { verArquivado: true });
     res.set('Content-Type', a.mime);
     res.set('Content-Disposition', disposicao(req.query.download ? 'attachment' : 'inline', a.name));
     res.send(a.data);

@@ -95,10 +95,11 @@ test('CSRF: rejeita sem token, com token errado e sem JSON', async () => {
   assert.equal(origem.status, 403);
 });
 
-let membro; let leitor; let boardId; let listIds; let cardId;
+let membro; let leitor; let boardId; let listIds; let cardId; let membroId;
 test('fluxo de quadro, papéis e isolamento entre usuários', async () => {
   const m = await admin.req('POST', '/api/users', { email: 'membro@empresa.com.br', name: 'Maria Membro', role: 'membro' });
   assert.equal(m.status, 201); assert.ok(m.data.temporaryPassword.length >= 16);
+  membroId = m.data.id;
   const l = await admin.req('POST', '/api/users', { email: 'leitor@empresa.com.br', name: 'Lucas Leitor', role: 'leitor' });
   membro = new Client(); await membro.login('membro@empresa.com.br', m.data.temporaryPassword);
   await membro.req('POST', '/api/auth/change-password', { currentPassword: m.data.temporaryPassword, newPassword: 'Rota#Azul-2026!x' });
@@ -187,6 +188,43 @@ test('anexos: membro envia, leitor só vê, tipo real conferido, limite de 5 MB'
   await membro.req('POST', `/api/cards/${c2.data.id}/attachments`, { name: 'a.png', data: png.toString('base64') });
   assert.equal((await membro.req('DELETE', `/api/cards/${c2.data.id}`, {})).status, 200);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM attachments WHERE card_id = ?').get(c2.data.id).n, 0);
+});
+
+test('arquivados: admin consulta (somente leitura) e desarquiva; demais não veem', async () => {
+  const q = await admin.req('POST', '/api/boards', { name: 'Projeto para arquivar' });
+  const qid = q.data.id;
+  await admin.req('PUT', `/api/boards/${qid}/members`, { userIds: [membroId] });
+  const v = await admin.req('GET', `/api/boards/${qid}`);
+  const c = await membro.req('POST', `/api/boards/${qid}/cards`, { listId: v.data.lists[0].id, title: 'Cartão antigo' });
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==', 'base64');
+  await membro.req('POST', `/api/cards/${c.data.id}/attachments`, { name: 'evidencia.png', data: png.toString('base64') });
+
+  assert.equal((await admin.req('DELETE', `/api/boards/${qid}`, {})).status, 200, 'arquiva');
+  assert.ok(!(await admin.req('GET', '/api/boards')).data.some((b) => b.id === qid), 'some da lista de quadros');
+
+  const lista = await admin.req('GET', '/api/boards/archived');
+  assert.equal(lista.status, 200);
+  const item = lista.data.find((b) => b.id === qid);
+  assert.ok(item, 'aparece em arquivados'); assert.equal(item.total, 1);
+
+  const ver = await admin.req('GET', `/api/boards/${qid}`);
+  assert.equal(ver.status, 200, 'admin abre o arquivado');
+  assert.equal(ver.data.board.archived, true);
+  assert.deepEqual(ver.data.permissions, { canEdit: false, canManage: false }, 'somente leitura');
+  assert.equal(ver.data.cards[0].title, 'Cartão antigo', 'dados preservados');
+  assert.equal((await admin.req('GET', `/api/cards/${c.data.id}/attachments`)).data.length, 1, 'anexos preservados');
+  assert.equal((await admin.req('PATCH', `/api/cards/${c.data.id}`, { title: 'x' })).status, 404, 'nada pode ser alterado');
+
+  assert.equal((await membro.req('GET', '/api/boards/archived')).status, 403, 'membro não vê a lista');
+  assert.equal((await membro.req('GET', `/api/boards/${qid}`)).status, 404, 'membro não abre o arquivado');
+  assert.equal((await membro.req('POST', `/api/boards/${qid}/unarchive`, {})).status, 403, 'membro não desarquiva');
+
+  assert.equal((await admin.req('POST', `/api/boards/${qid}/unarchive`, {})).status, 200, 'admin desarquiva');
+  const depois = await membro.req('GET', `/api/boards/${qid}`);
+  assert.equal(depois.status, 200, 'volta para os membros');
+  assert.equal(depois.data.board.archived, false);
+  assert.equal(depois.data.permissions.canEdit, true, 'volta a ser editável');
+  assert.equal((await admin.req('POST', `/api/boards/${qid}/unarchive`, {})).status, 404, 'não desarquiva o que não está arquivado');
 });
 
 test('somente admin acessa usuários e auditoria', async () => {

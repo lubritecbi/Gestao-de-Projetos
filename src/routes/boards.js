@@ -30,6 +30,29 @@ router.get('/', (req, res) => {
   res.json(rows.map(boardSummary));
 });
 
+// Projetos arquivados: só o administrador vê (somente leitura).
+router.get('/archived', (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') throw new HttpError(403, 'Você não tem permissão para esta ação.');
+    const rows = db.prepare(`SELECT b.id, b.code, b.name, b.area, b.updated_at AS archivedAt, u.name AS ownerName,
+        (SELECT COUNT(*) FROM cards c WHERE c.board_id = b.id) AS total,
+        (SELECT COUNT(*) FROM cards c JOIN lists l ON l.id = c.list_id WHERE c.board_id = b.id AND l.is_done = 1) AS done
+      FROM boards b LEFT JOIN users u ON u.id = b.owner_id WHERE b.archived = 1 ORDER BY b.code`).all();
+    res.json(rows);
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/unarchive', (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') throw new HttpError(403, 'Apenas administradores podem desarquivar projetos.');
+    const boardId = parse(id, req.params.id);
+    const r = db.prepare('UPDATE boards SET archived = 0, updated_at = ? WHERE id = ? AND archived = 1').run(Date.now(), boardId);
+    if (!r.changes) throw new HttpError(404, 'Projeto arquivado não encontrado.');
+    audit(req, 'quadro.desarquivado', { entity: 'board', entityId: boardId });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 const boardFields = {
   code: text(20, 2).refine((s) => /^[A-Za-z0-9._-]+$/.test(s), 'Use letras, números, ponto, hífen ou sublinhado.'),
   name: text(120, 2),
@@ -90,7 +113,7 @@ router.post('/', requireRole('admin', 'gestor'), (req, res, next) => {
 router.get('/:id', (req, res, next) => {
   try {
     const boardId = parse(id, req.params.id);
-    const access = boardAccess(req.user, boardId);
+    const access = boardAccess(req.user, boardId, { verArquivado: true });
     const lists = db.prepare('SELECT id, name, position, is_done AS isDone FROM lists WHERE board_id = ? ORDER BY position').all(boardId);
     const cards = db.prepare(`SELECT c.id, c.list_id AS listId, c.title, c.description, c.assignee_id AS assigneeId, u.name AS assigneeName,
         c.due_date AS dueDate, c.priority, c.phase, c.checklists, c.position, c.completed_at AS completedAt, c.updated_at AS updatedAt,
@@ -101,7 +124,7 @@ router.get('/:id', (req, res, next) => {
       WHERE m.board_id = ? AND u.active = 1 ORDER BY u.name`).all(boardId);
     const owner = access.board.owner_id ? db.prepare('SELECT name FROM users WHERE id = ?').get(access.board.owner_id) : null;
     res.json({
-      board: { ...boardSummary(access.board), owner_name: owner ? owner.name : null },
+      board: { ...boardSummary(access.board), owner_name: owner ? owner.name : null, archived: !!access.archived },
       permissions: { canEdit: access.canEdit, canManage: access.canManage },
       lists, cards, members,
     });
